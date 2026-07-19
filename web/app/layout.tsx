@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
+import Logo from "@/components/Logo";
 import SearchBox from "@/components/SearchBox";
 import "./globals.css";
 
@@ -15,8 +16,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Euroleague Stats",
-  description: "EuroLeague standings, fixtures, results, rosters and stats",
+  title: {
+    default: "Eurostepper — EuroLeague stats",
+    template: "%s · Eurostepper",
+  },
+  description:
+    "EuroLeague standings, results, shot charts, rosters and stats — Eurostepper",
 };
 
 const navLinks = [
@@ -41,8 +46,12 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-neutral-950 text-neutral-100 font-sans">
         <header className="border-b border-neutral-800 bg-neutral-900/80 sticky top-0 z-10 backdrop-blur">
           <div className="mx-auto flex max-w-5xl items-center gap-6 px-4 py-3">
-            <Link href="/" className="text-lg font-bold tracking-tight">
-              <span className="text-orange-500">EL</span> Stats
+            <Link
+              href="/"
+              className="flex items-center gap-2 text-lg font-bold tracking-tight"
+            >
+              <Logo size={30} />
+              Eurostepper
             </Link>
             <nav className="flex gap-4 text-sm text-neutral-300">
               {navLinks.map((l) => (
