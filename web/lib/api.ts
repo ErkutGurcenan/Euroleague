@@ -307,6 +307,19 @@ export function getHighs() {
   }>(`/api/highs`);
 }
 
+export type NotableEntry = {
+  game: Game;
+  value: number;
+  note: string | null;
+};
+
+export function getNotableGames() {
+  return get<{
+    season: string;
+    categories: { key: string; label: string; entries: NotableEntry[] }[];
+  }>(`/api/games/notable`);
+}
+
 export type AwardEntry = {
   award: string;
   playerCode: string;

@@ -19,6 +19,7 @@ from euroleague_pipeline.models import (  # noqa: E402
     Award,
     Club,
     Game,
+    PbpEvent,
     PersonStint,
     PlayerGameStat,
     Shot,
@@ -288,6 +289,127 @@ def games(
         return {
             "season": season,
             "games": [game_dict(g, clubs) for g in session.execute(q).scalars()],
+        }
+
+
+_comeback_cache: dict[str, dict[int, int]] = {}
+
+
+def winner_max_deficits(session, season: str) -> dict[int, int]:
+    """Per game: the eventual winner's largest deficit, from the pbp
+    running score. Computed once per season and cached in-process."""
+    if season in _comeback_cache:
+        return _comeback_cache[season]
+    winners: dict[int, bool] = {}  # game_code -> home team won
+    for gm in session.execute(
+        select(Game).where(Game.season_code == season, Game.played)
+    ).scalars():
+        if gm.local_score is not None and gm.road_score is not None:
+            winners[gm.game_code] = gm.local_score > gm.road_score
+    deficits: dict[int, int] = {}
+    rows = session.execute(
+        select(
+            PbpEvent.game_code, PbpEvent.points_a, PbpEvent.points_b
+        )
+        .where(PbpEvent.season_code == season, PbpEvent.points_a.is_not(None))
+        .order_by(PbpEvent.game_code, PbpEvent.quarter, PbpEvent.play_number)
+    )
+    for game_code, pts_home, pts_road in rows:
+        home_won = winners.get(game_code)
+        if home_won is None or pts_home is None or pts_road is None:
+            continue
+        deficit = (pts_road - pts_home) if home_won else (pts_home - pts_road)
+        if deficit > deficits.get(game_code, 0):
+            deficits[game_code] = deficit
+    _comeback_cache[season] = deficits
+    return deficits
+
+
+@app.get("/api/games/notable")
+def notable_games(season: str = DEFAULT_SEASON, limit: int = 8) -> dict:
+    with Session(engine) as session:
+        clubs = load_clubs(session)
+        games = [
+            g
+            for g in session.execute(
+                select(Game).where(Game.season_code == season, Game.played)
+            ).scalars()
+            if g.local_score is not None and g.road_score is not None
+        ]
+        by_code = {g.game_code: g for g in games}
+
+        def entry(g: Game, value: int, note: Optional[str] = None) -> dict:
+            return {"game": game_dict(g, clubs), "value": value, "note": note}
+
+        margin = lambda g: abs(g.local_score - g.road_score)  # noqa: E731
+        total = lambda g: g.local_score + g.road_score  # noqa: E731
+
+        def ot_points(g: Game) -> int:
+            q = sum(
+                x or 0
+                for x in (g.local_q1, g.local_q2, g.local_q3, g.local_q4,
+                          g.road_q1, g.road_q2, g.road_q3, g.road_q4)
+            )
+            return total(g) - q
+
+        deficits = winner_max_deficits(session, season)
+        comebacks = sorted(deficits.items(), key=lambda kv: -kv[1])[:limit]
+
+        return {
+            "season": season,
+            "categories": [
+                {
+                    "key": "comebacks",
+                    "label": "Biggest comebacks",
+                    "entries": [
+                        entry(
+                            by_code[gc],
+                            d,
+                            f"won after trailing by {d}",
+                        )
+                        for gc, d in comebacks
+                        if gc in by_code
+                    ],
+                },
+                {
+                    "key": "blowouts",
+                    "label": "Biggest blowouts",
+                    "entries": [
+                        entry(g, margin(g), f"won by {margin(g)}")
+                        for g in sorted(games, key=margin, reverse=True)[:limit]
+                    ],
+                },
+                {
+                    "key": "closest",
+                    "label": "Closest finishes",
+                    "entries": [
+                        entry(g, margin(g), f"decided by {margin(g)}")
+                        for g in sorted(
+                            games, key=lambda g: (margin(g), -total(g))
+                        )[:limit]
+                    ],
+                },
+                {
+                    "key": "overtime",
+                    "label": "Overtime games",
+                    "entries": [
+                        entry(g, ot_points(g), f"{ot_points(g)} OT points")
+                        for g in sorted(
+                            (g for g in games if ot_points(g) > 0),
+                            key=ot_points,
+                            reverse=True,
+                        )[:limit]
+                    ],
+                },
+                {
+                    "key": "shootouts",
+                    "label": "Highest-scoring games",
+                    "entries": [
+                        entry(g, total(g), f"{total(g)} combined points")
+                        for g in sorted(games, key=total, reverse=True)[:limit]
+                    ],
+                },
+            ],
         }
 
 
