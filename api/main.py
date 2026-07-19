@@ -314,6 +314,13 @@ def game_detail(game_code: int, season: str = DEFAULT_SEASON) -> dict:
                 PlayerGameStat.seconds_played.desc(),
             )
         ).scalars().all()
+        game_shots = session.execute(
+            select(Shot).where(
+                Shot.season_code == season,
+                Shot.game_code == game_code,
+                Shot.action_id.in_(["2FGM", "2FGA", "3FGM", "3FGA"]),
+            )
+        ).scalars().all()
 
         def player_line(s: PlayerGameStat) -> dict:
             return {
@@ -368,6 +375,21 @@ def game_detail(game_code: int, season: str = DEFAULT_SEASON) -> dict:
                 "overtime": (score - q_sum) if score and q_sum and score > q_sum else None,
                 "players": [player_line(l) for l in rows],
                 "totals": team_totals(rows),
+                "shots": [
+                    {
+                        "x": s.coord_x,
+                        "y": s.coord_y,
+                        "made": s.made,
+                        "three": s.action_id in ("3FGM", "3FGA"),
+                        "zone": s.zone,
+                        "fastbreak": s.fastbreak,
+                        "gameCode": s.game_code,
+                        "home": None,
+                        "won": None,
+                    }
+                    for s in game_shots
+                    if s.club_code == club_code
+                ],
             }
 
         a, b = game.local_club_code, game.road_club_code

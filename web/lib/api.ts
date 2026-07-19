@@ -211,6 +211,7 @@ export type GameDetailSide = {
   overtime: number | null;
   players: BoxScoreLine[];
   totals: TeamTotals;
+  shots: ShotPoint[];
 };
 
 export type GameDetail = {
