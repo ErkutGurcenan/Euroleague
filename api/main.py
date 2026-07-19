@@ -785,6 +785,15 @@ def club_detail(code: str, season: str = DEFAULT_SEASON) -> dict:
             )
             .order_by(PersonStint.dorsal)
         ).scalars()
+        coaches = session.execute(
+            select(PersonStint)
+            .where(
+                PersonStint.season_code == season,
+                PersonStint.club_code == code,
+                PersonStint.type.in_(["E", "A"]),  # E = head coach, A = assistant
+            )
+            .order_by(PersonStint.type, PersonStint.start_date)
+        ).scalars().all()
         g = PlayerGameStat
         player_stats = {
             row[0]: row
@@ -832,6 +841,14 @@ def club_detail(code: str, season: str = DEFAULT_SEASON) -> dict:
         return {
             "club": club_dict(club),
             "stats": club_season_stats(session, code, season),
+            "coaches": [
+                {
+                    "name": c.name,
+                    "role": "Head coach" if c.type == "E" else "Assistant coach",
+                    "active": c.active,
+                }
+                for c in coaches
+            ],
             "roster": [
                 {
                     "personCode": p.person_code,

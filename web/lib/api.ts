@@ -270,10 +270,17 @@ export type TeamSeasonStats = {
   ftPct: number | null;
 };
 
+export type CoachEntry = {
+  name: string | null;
+  role: string;
+  active: boolean | null;
+};
+
 export function getClub(code: string) {
   return get<{
     club: ClubSummary;
     stats: TeamSeasonStats | null;
+    coaches: CoachEntry[];
     roster: RosterEntry[];
     games: Game[];
   }>(`/api/clubs/${code}`);

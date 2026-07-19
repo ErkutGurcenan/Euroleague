@@ -25,7 +25,11 @@ export default async function TeamPage({
   } catch {
     notFound();
   }
-  const { club, stats, roster, games } = data;
+  const { club, stats, coaches, roster, games } = data;
+  const headCoach = coaches.find((c) => c.role === "Head coach" && c.active);
+  const assistants = coaches.filter(
+    (c) => c.role === "Assistant coach" && c.active,
+  );
   const activeRoster = roster.filter((p) => p.active);
   const results = games.filter((g) => g.played);
   const upcoming = games.filter((g) => !g.played);
@@ -56,6 +60,19 @@ export default async function TeamPage({
               </>
             )}
           </p>
+          {headCoach && (
+            <p className="mt-0.5 text-sm text-neutral-400">
+              Head coach:{" "}
+              <span className="text-neutral-200">{headCoach.name}</span>
+              {assistants.length > 0 && (
+                <span className="text-neutral-500">
+                  {" "}
+                  · Assistants:{" "}
+                  {assistants.map((a) => a.name).join(", ")}
+                </span>
+              )}
+            </p>
+          )}
         </div>
       </div>
 
