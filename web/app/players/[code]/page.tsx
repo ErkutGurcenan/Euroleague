@@ -12,6 +12,20 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
   );
 }
 
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ code: string }>;
+}) {
+  const { code } = await params;
+  try {
+    const player = await getPlayer(code);
+    return { title: player.name };
+  } catch {
+    return {};
+  }
+}
+
 export default async function PlayerPage({
   params,
 }: {

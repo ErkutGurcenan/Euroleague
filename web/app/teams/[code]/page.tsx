@@ -14,6 +14,20 @@ function age(birthDate: string | null): string {
   return String(a);
 }
 
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ code: string }>;
+}) {
+  const { code } = await params;
+  try {
+    const { club } = await getClub(code.toUpperCase());
+    return { title: club.name };
+  } catch {
+    return {};
+  }
+}
+
 export default async function TeamPage({
   params,
 }: {

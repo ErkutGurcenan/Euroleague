@@ -1,3 +1,5 @@
+export const metadata = { title: "Standings" };
+
 import Link from "next/link";
 import { getStandings } from "@/lib/api";
 

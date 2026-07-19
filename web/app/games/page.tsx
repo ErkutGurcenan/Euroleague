@@ -1,3 +1,5 @@
+export const metadata = { title: "Games" };
+
 import Link from "next/link";
 import GameCard from "@/components/GameCard";
 import { getGames, type Game } from "@/lib/api";

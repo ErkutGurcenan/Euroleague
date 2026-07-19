@@ -151,6 +151,24 @@ function TeamStatBar({
   );
 }
 
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ gameCode: string }>;
+}) {
+  const { gameCode } = await params;
+  try {
+    const g = await getGame(Number(gameCode));
+    const h = g.home.club?.abbreviatedName ?? g.home.club?.code;
+    const a = g.away.club?.abbreviatedName ?? g.away.club?.code;
+    return {
+      title: g.played ? `${h} ${g.home.score}–${g.away.score} ${a}` : `${h} vs ${a}`,
+    };
+  } catch {
+    return {};
+  }
+}
+
 export default async function GamePage({
   params,
 }: {

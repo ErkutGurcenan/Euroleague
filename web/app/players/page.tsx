@@ -1,3 +1,5 @@
+export const metadata = { title: "Players" };
+
 import Link from "next/link";
 import { getPlayers, type PlayerSummary } from "@/lib/api";
 
