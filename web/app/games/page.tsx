@@ -1,43 +1,155 @@
 import Link from "next/link";
 import GameCard from "@/components/GameCard";
-import { getGames } from "@/lib/api";
+import { getGames, type Game } from "@/lib/api";
+
+const PHASES: Record<string, string> = {
+  PI: "Play-In",
+  PO: "Playoffs",
+  FF: "Final Four",
+};
+
+function SeriesSection({ title, games }: { title: string; games: Game[] }) {
+  // series tally: wins per club across the group's games
+  const wins = new Map<string, number>();
+  for (const g of games) {
+    if (!g.played) continue;
+    const winner =
+      (g.home.score ?? 0) > (g.away.score ?? 0) ? g.home.code : g.away.code;
+    if (winner) wins.set(winner, (wins.get(winner) ?? 0) + 1);
+  }
+  const tally =
+    games.length > 1
+      ? [g0Side(games[0], "home"), g0Side(games[0], "away")]
+          .map((code) => `${wins.get(code ?? "") ?? 0}`)
+          .join("–")
+      : null;
+
+  return (
+    <div className="mb-6">
+      <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-neutral-400">
+        {title.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())}
+        {tally && (
+          <span className="ml-2 rounded bg-neutral-800 px-1.5 py-0.5 text-xs text-neutral-300">
+            Series {tally}
+          </span>
+        )}
+      </h2>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {games.map((g) => (
+          <GameCard key={g.id} game={g} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function g0Side(g: Game, side: "home" | "away"): string | null {
+  return g[side].code;
+}
+
+function FinalFourBracket({ games }: { games: Game[] }) {
+  const semiA = games.find((g) => g.groupName?.toUpperCase().startsWith("SEMIFINAL A"));
+  const semiB = games.find((g) => g.groupName?.toUpperCase().startsWith("SEMIFINAL B"));
+  const final = games.find((g) =>
+    g.groupName?.toUpperCase().includes("CHAMPIONSHIP"),
+  );
+  const label = (text: string) => (
+    <h2 className="mb-2 text-center text-sm font-semibold uppercase tracking-wide text-neutral-400">
+      {text}
+    </h2>
+  );
+  return (
+    <div className="grid items-center gap-4 lg:grid-cols-[1fr_auto_1.15fr_auto_1fr]">
+      <div>
+        {label("Semifinal")}
+        {semiA && <GameCard game={semiA} />}
+      </div>
+      <div className="hidden text-2xl text-neutral-600 lg:block">⟶</div>
+      <div className="rounded-xl border border-orange-600/40 p-1.5">
+        {label("🏆 Championship")}
+        {final && <GameCard game={final} />}
+      </div>
+      <div className="hidden text-2xl text-neutral-600 lg:block">⟵</div>
+      <div>
+        {label("Semifinal")}
+        {semiB && <GameCard game={semiB} />}
+      </div>
+    </div>
+  );
+}
 
 export default async function GamesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ round?: string }>;
+  searchParams: Promise<{ round?: string; phase?: string }>;
 }) {
   const params = await searchParams;
   const { games: allGames } = await getGames();
 
-  const rounds = [...new Set(allGames.map((g) => g.round))].filter(
-    (r): r is number => r !== null,
-  );
+  const rsRounds = [
+    ...new Set(
+      allGames
+        .filter((g) => g.phaseType === "RS" && g.round !== null)
+        .map((g) => g.round as number),
+    ),
+  ].sort((a, b) => a - b);
+
+  const phase = params.phase && PHASES[params.phase] ? params.phase : null;
   const lastPlayedRound = Math.max(
     0,
-    ...allGames.filter((g) => g.played && g.round !== null).map((g) => g.round!),
+    ...allGames
+      .filter((g) => g.phaseType === "RS" && g.played && g.round !== null)
+      .map((g) => g.round!),
   );
-  const round = params.round ? Number(params.round) : lastPlayedRound;
-  const games = allGames.filter((g) => g.round === round);
+  const round = phase ? null : params.round ? Number(params.round) : lastPlayedRound;
+
+  let content;
+  if (phase === "FF") {
+    content = (
+      <FinalFourBracket games={allGames.filter((g) => g.phaseType === "FF")} />
+    );
+  } else if (phase) {
+    const phaseGames = allGames.filter((g) => g.phaseType === phase);
+    const groups = new Map<string, Game[]>();
+    for (const g of phaseGames) {
+      const key = g.groupName ?? "Other";
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(g);
+    }
+    content = [...groups.entries()].map(([name, games]) => (
+      <SeriesSection
+        key={name}
+        title={name.length <= 2 ? `Play-In ${name}` : name}
+        games={games}
+      />
+    ));
+  } else {
+    const games = allGames.filter((g) => g.round === round);
+    content = (
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {games.map((g) => (
+          <GameCard key={g.id} game={g} />
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div>
       <div className="mb-4 flex items-baseline justify-between">
         <h1 className="text-2xl font-bold">Games</h1>
         <span className="text-sm text-neutral-400">
-          {games[0]?.phaseType === "RS"
-            ? `Round ${round} of ${rounds.length}`
-            : games[0]?.groupName ?? `Round ${round}`}
+          {phase ? PHASES[phase] : `Regular season · Round ${round}`}
         </span>
       </div>
 
-      <div className="mb-5 flex flex-wrap gap-1">
-        {rounds.map((r) => (
+      <div className="mb-5 flex flex-wrap items-center gap-1">
+        {rsRounds.map((r) => (
           <Link
             key={r}
             href={`/games?round=${r}`}
             className={`rounded px-2 py-1 text-xs tabular-nums ${
-              r === round
+              !phase && r === round
                 ? "bg-orange-600 text-white"
                 : "bg-neutral-900 text-neutral-400 hover:bg-neutral-800"
             }`}
@@ -45,16 +157,23 @@ export default async function GamesPage({
             {r}
           </Link>
         ))}
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {games.map((g) => (
-          <GameCard key={g.id} game={g} />
+        <span className="mx-1 h-4 w-px bg-neutral-700" />
+        {Object.entries(PHASES).map(([code, label]) => (
+          <Link
+            key={code}
+            href={`/games?phase=${code}`}
+            className={`rounded px-2 py-1 text-xs font-medium ${
+              phase === code
+                ? "bg-orange-600 text-white"
+                : "bg-neutral-900 text-neutral-300 hover:bg-neutral-800"
+            }`}
+          >
+            {label}
+          </Link>
         ))}
       </div>
-      {games.length === 0 && (
-        <p className="text-neutral-400">No games in this round.</p>
-      )}
+
+      {content}
     </div>
   );
 }

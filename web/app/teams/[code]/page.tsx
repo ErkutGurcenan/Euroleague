@@ -25,7 +25,7 @@ export default async function TeamPage({
   } catch {
     notFound();
   }
-  const { club, roster, games } = data;
+  const { club, stats, roster, games } = data;
   const activeRoster = roster.filter((p) => p.active);
   const results = games.filter((g) => g.played);
   const upcoming = games.filter((g) => !g.played);
@@ -58,6 +58,34 @@ export default async function TeamPage({
           </p>
         </div>
       </div>
+
+      {stats && (
+        <>
+          <h2 className="mb-3 text-lg font-semibold">Season</h2>
+          <div className="mb-8 grid grid-cols-3 gap-3 sm:grid-cols-5 lg:grid-cols-10">
+            {[
+              ["Record", `${stats.wins}–${stats.losses}`],
+              ["PTS", stats.points],
+              ["Opp PTS", stats.opponentPoints ?? "–"],
+              ["REB", stats.rebounds],
+              ["AST", stats.assists],
+              ["STL", stats.steals],
+              ["TO", stats.turnovers],
+              ["2P%", stats.fg2Pct ?? "–"],
+              ["3P%", stats.fg3Pct ?? "–"],
+              ["FT%", stats.ftPct ?? "–"],
+            ].map(([label, value]) => (
+              <div
+                key={label}
+                className="rounded-lg border border-neutral-800 bg-neutral-900/40 px-2 py-3 text-center"
+              >
+                <div className="text-lg font-bold tabular-nums">{value}</div>
+                <div className="text-xs uppercase text-neutral-500">{label}</div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
 
       <h2 className="mb-3 text-lg font-semibold">Roster</h2>
       <div className="mb-8 overflow-x-auto rounded-lg border border-neutral-800">

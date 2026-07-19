@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
+import SearchBox from "@/components/SearchBox";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -52,7 +53,10 @@ export default function RootLayout({
                 </Link>
               ))}
             </nav>
-            <span className="ml-auto text-xs text-neutral-500">2025-26</span>
+            <div className="ml-auto flex items-center gap-3">
+              <SearchBox />
+              <span className="text-xs text-neutral-500">2025-26</span>
+            </div>
           </div>
         </header>
         <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">

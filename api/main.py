@@ -86,6 +86,52 @@ def health() -> dict:
     return {"ok": True, "db": DB_PATH.exists()}
 
 
+@app.get("/api/search")
+def search(q: str = Query(min_length=2), season: str = DEFAULT_SEASON) -> dict:
+    like = f"%{q}%"
+    with Session(engine) as session:
+        clubs = session.execute(
+            select(Club)
+            .where(
+                Club.country_code.is_not(None),  # skip virtual FF placeholders
+                Club.name.ilike(like)
+                | Club.abbreviated_name.ilike(like)
+                | Club.code.ilike(like),
+            )
+            .order_by(Club.name)
+            .limit(8)
+        ).scalars().all()
+        players = session.execute(
+            select(
+                PersonStint.person_code,
+                func.max(PersonStint.name),
+                func.max(PersonStint.club_code),
+            )
+            .where(
+                PersonStint.season_code == season,
+                PersonStint.type == "J",
+                PersonStint.name.ilike(like),
+            )
+            .group_by(PersonStint.person_code)
+            .limit(8)
+        ).all()
+        club_map = load_clubs(session)
+        return {
+            "clubs": [club_dict(c) for c in clubs],
+            "players": [
+                {
+                    "playerCode": code,
+                    "name": name,
+                    "clubCode": club_code,
+                    "clubName": club_map[club_code].name
+                    if club_code in club_map
+                    else None,
+                }
+                for code, name, club_code in players
+            ],
+        }
+
+
 @app.get("/api/standings")
 def standings(season: str = DEFAULT_SEASON, round: Optional[int] = Query(None)) -> dict:
     with Session(engine) as session:
@@ -493,6 +539,65 @@ def club_shots(code: str, season: str = DEFAULT_SEASON) -> dict:
         return shots_payload(session, season, club=code)
 
 
+def club_season_stats(session, code: str, season: str) -> Optional[dict]:
+    """Per-game team averages from box scores + record from game results."""
+    g = PlayerGameStat
+    row = session.execute(
+        select(
+            func.count(func.distinct(g.game_code)),
+            func.sum(g.points),
+            func.sum(g.fg2m), func.sum(g.fg2a),
+            func.sum(g.fg3m), func.sum(g.fg3a),
+            func.sum(g.ftm), func.sum(g.fta),
+            func.sum(g.oreb), func.sum(g.dreb), func.sum(g.treb),
+            func.sum(g.ast), func.sum(g.stl), func.sum(g.tov),
+            func.sum(g.blk), func.sum(g.pir),
+        ).where(g.season_code == season, g.club_code == code)
+    ).one()
+    n = row[0]
+    if not n:
+        return None
+    (_, pts, fg2m, fg2a, fg3m, fg3a, ftm, fta,
+     oreb, dreb, treb, ast, stl, tov, blk, pir) = row
+
+    games = session.execute(
+        select(Game).where(
+            Game.season_code == season,
+            Game.played,
+            (Game.local_club_code == code) | (Game.road_club_code == code),
+        )
+    ).scalars().all()
+    wins = opp_pts = 0
+    for gm in games:
+        home = gm.local_club_code == code
+        own = gm.local_score if home else gm.road_score
+        opp = gm.road_score if home else gm.local_score
+        if own is not None and opp is not None:
+            opp_pts += opp
+            if own > opp:
+                wins += 1
+
+    per = lambda total: round((total or 0) / n, 1)  # noqa: E731
+    return {
+        "gamesPlayed": n,
+        "wins": wins,
+        "losses": len(games) - wins,
+        "points": per(pts),
+        "opponentPoints": round(opp_pts / len(games), 1) if games else None,
+        "rebounds": per(treb),
+        "offensiveRebounds": per(oreb),
+        "defensiveRebounds": per(dreb),
+        "assists": per(ast),
+        "steals": per(stl),
+        "turnovers": per(tov),
+        "blocks": per(blk),
+        "pir": per(pir),
+        "fg2Pct": pct(fg2m, fg2a),
+        "fg3Pct": pct(fg3m, fg3a),
+        "ftPct": pct(ftm, fta),
+    }
+
+
 @app.get("/api/clubs/{code}")
 def club_detail(code: str, season: str = DEFAULT_SEASON) -> dict:
     with Session(engine) as session:
@@ -519,6 +624,7 @@ def club_detail(code: str, season: str = DEFAULT_SEASON) -> dict:
         ).scalars()
         return {
             "club": club_dict(club),
+            "stats": club_season_stats(session, code, season),
             "roster": [
                 {
                     "personCode": p.person_code,

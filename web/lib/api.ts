@@ -236,8 +236,40 @@ export function getClubShots(code: string) {
   );
 }
 
+export type TeamSeasonStats = {
+  gamesPlayed: number;
+  wins: number;
+  losses: number;
+  points: number;
+  opponentPoints: number | null;
+  rebounds: number;
+  offensiveRebounds: number;
+  defensiveRebounds: number;
+  assists: number;
+  steals: number;
+  turnovers: number;
+  blocks: number;
+  pir: number;
+  fg2Pct: number | null;
+  fg3Pct: number | null;
+  ftPct: number | null;
+};
+
 export function getClub(code: string) {
-  return get<{ club: ClubSummary; roster: RosterEntry[]; games: Game[] }>(
-    `/api/clubs/${code}`,
-  );
+  return get<{
+    club: ClubSummary;
+    stats: TeamSeasonStats | null;
+    roster: RosterEntry[];
+    games: Game[];
+  }>(`/api/clubs/${code}`);
 }
+
+export type SearchResults = {
+  clubs: ClubSummary[];
+  players: {
+    playerCode: string;
+    name: string;
+    clubCode: string | null;
+    clubName: string | null;
+  }[];
+};
