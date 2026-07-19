@@ -175,13 +175,17 @@ def search(q: str = Query(min_length=2), season: str = DEFAULT_SEASON) -> dict:
         }
 
 
-def club_splits(session, season: str) -> dict[str, dict]:
-    """Home/away records and last-5 form per club from RS game results."""
-    games = session.execute(
+def club_splits(session, season: str, up_to_round: Optional[int] = None) -> dict[str, dict]:
+    """Home/away records and last-5 form per club from RS game results,
+    optionally only counting rounds up to `up_to_round` (time machine)."""
+    q = (
         select(Game)
         .where(Game.season_code == season, Game.played, Game.phase_type == "RS")
         .order_by(Game.utc_date)
-    ).scalars().all()
+    )
+    if up_to_round is not None:
+        q = q.where(Game.round <= up_to_round)
+    games = session.execute(q).scalars().all()
     splits: dict[str, dict] = {}
     for gm in games:
         if gm.local_score is None or gm.road_score is None:
@@ -218,7 +222,7 @@ def standings(season: str = DEFAULT_SEASON, round: Optional[int] = Query(None)) 
         if rnd is None:
             raise HTTPException(404, f"no standings for season {season}")
         clubs = load_clubs(session)
-        splits = club_splits(session, season)
+        splits = club_splits(session, season, up_to_round=rnd)
         rows = session.execute(
             select(StandingRow)
             .where(StandingRow.season_code == season, StandingRow.round == rnd)
