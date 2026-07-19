@@ -370,9 +370,22 @@ def game_detail(game_code: int, season: str = DEFAULT_SEASON) -> dict:
                 "totals": team_totals(rows),
             }
 
+        a, b = game.local_club_code, game.road_club_code
+        meetings = session.execute(
+            select(Game)
+            .where(
+                Game.season_code == season,
+                Game.id != game.id,
+                ((Game.local_club_code == a) & (Game.road_club_code == b))
+                | ((Game.local_club_code == b) & (Game.road_club_code == a)),
+            )
+            .order_by(Game.utc_date)
+        ).scalars().all()
+
         return {
             "season": season,
             "gameCode": game_code,
+            "headToHead": [game_dict(m, clubs) for m in meetings],
             "round": game.round,
             "roundName": game.round_name,
             "phaseType": game.phase_type,

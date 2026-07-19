@@ -214,6 +214,7 @@ export type GameDetailSide = {
 export type GameDetail = {
   season: string;
   gameCode: number;
+  headToHead: Game[];
   round: number | null;
   roundName: string | null;
   phaseType: string | null;
