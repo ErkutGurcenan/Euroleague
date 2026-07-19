@@ -1,0 +1,122 @@
+import { notFound } from "next/navigation";
+import GameCard from "@/components/GameCard";
+import { getClub } from "@/lib/api";
+
+function age(birthDate: string | null): string {
+  if (!birthDate) return "–";
+  const b = new Date(birthDate);
+  const now = new Date();
+  let a = now.getFullYear() - b.getFullYear();
+  const m = now.getMonth() - b.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < b.getDate())) a--;
+  return String(a);
+}
+
+export default async function TeamPage({
+  params,
+}: {
+  params: Promise<{ code: string }>;
+}) {
+  const { code } = await params;
+  let data;
+  try {
+    data = await getClub(code.toUpperCase());
+  } catch {
+    notFound();
+  }
+  const { club, roster, games } = data;
+  const activeRoster = roster.filter((p) => p.active);
+  const results = games.filter((g) => g.played);
+  const upcoming = games.filter((g) => !g.played);
+
+  return (
+    <div>
+      <div className="mb-6 flex items-center gap-4">
+        {club.crestUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={club.crestUrl} alt="" className="h-16 w-16 object-contain" />
+        )}
+        <div>
+          <h1 className="text-2xl font-bold">{club.name}</h1>
+          <p className="text-sm text-neutral-400">
+            {club.city ? `${club.city}, ` : ""}
+            {club.country}
+            {club.website && (
+              <>
+                {" · "}
+                <a
+                  href={club.website}
+                  className="text-orange-400 hover:underline"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  website
+                </a>
+              </>
+            )}
+          </p>
+        </div>
+      </div>
+
+      <h2 className="mb-3 text-lg font-semibold">Roster</h2>
+      <div className="mb-8 overflow-x-auto rounded-lg border border-neutral-800">
+        <table className="w-full text-sm">
+          <thead className="bg-neutral-900 text-left text-xs uppercase text-neutral-400">
+            <tr>
+              <th className="px-3 py-2">#</th>
+              <th className="px-3 py-2">Player</th>
+              <th className="px-3 py-2">Position</th>
+              <th className="px-3 py-2 text-right">Height</th>
+              <th className="px-3 py-2 text-right">Age</th>
+              <th className="px-3 py-2">Country</th>
+            </tr>
+          </thead>
+          <tbody>
+            {activeRoster.map((p) => (
+              <tr
+                key={`${p.personCode}-${p.dorsal}`}
+                className="border-t border-neutral-800/60"
+              >
+                <td className="px-3 py-2 tabular-nums text-neutral-400">
+                  {p.dorsal ?? "–"}
+                </td>
+                <td className="px-3 py-2 font-medium">{p.name}</td>
+                <td className="px-3 py-2 text-neutral-400">
+                  {p.positionName ?? "–"}
+                </td>
+                <td className="px-3 py-2 text-right text-neutral-400">
+                  {p.heightCm ? `${p.heightCm} cm` : "–"}
+                </td>
+                <td className="px-3 py-2 text-right text-neutral-400">
+                  {age(p.birthDate)}
+                </td>
+                <td className="px-3 py-2 text-neutral-400">{p.country}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {upcoming.length > 0 && (
+        <>
+          <h2 className="mb-3 text-lg font-semibold">Upcoming</h2>
+          <div className="mb-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {upcoming.slice(0, 6).map((g) => (
+              <GameCard key={g.id} game={g} />
+            ))}
+          </div>
+        </>
+      )}
+
+      <h2 className="mb-3 text-lg font-semibold">Results</h2>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {results
+          .slice()
+          .reverse()
+          .map((g) => (
+            <GameCard key={g.id} game={g} />
+          ))}
+      </div>
+    </div>
+  );
+}
