@@ -20,6 +20,9 @@ export type StandingRow = {
   pointsAgainst: number;
   pointsDiff: number;
   qualified: boolean | null;
+  home: string;
+  away: string;
+  form: ("W" | "L")[];
 };
 
 export type GameSide = {
@@ -76,8 +79,13 @@ export function getGames(params?: { round?: number; club?: string }) {
   return get<{ season: string; games: Game[] }>(`/api/games${suffix}`);
 }
 
+export type ClubWithRecord = ClubSummary & {
+  position: number | null;
+  record: string | null;
+};
+
 export function getClubs() {
-  return get<{ clubs: ClubSummary[] }>(`/api/clubs`);
+  return get<{ clubs: ClubWithRecord[] }>(`/api/clubs`);
 }
 
 export type PlayerSummary = {
@@ -262,6 +270,37 @@ export function getClub(code: string) {
     roster: RosterEntry[];
     games: Game[];
   }>(`/api/clubs/${code}`);
+}
+
+export type HighEntry = {
+  playerCode: string;
+  name: string | null;
+  clubCode: string | null;
+  value: number;
+  gameCode: number;
+  round: number | null;
+  opponent: string | null;
+  utcDate: string | null;
+};
+
+export function getHighs() {
+  return get<{
+    season: string;
+    categories: { key: string; label: string; entries: HighEntry[] }[];
+  }>(`/api/highs`);
+}
+
+export type AwardEntry = {
+  award: string;
+  playerCode: string;
+  name: string | null;
+  clubCode: string | null;
+  clubName: string | null;
+  crestUrl: string | null;
+};
+
+export function getAwards() {
+  return get<{ season: string; awards: AwardEntry[] }>(`/api/awards`);
 }
 
 export type SearchResults = {

@@ -155,6 +155,9 @@ export default async function PlayerPage({
           </tbody>
         </table>
       </div>
+      <p className="mt-2 text-xs text-neutral-500">
+        vs = home game · @ = away game
+      </p>
     </div>
   );
 }

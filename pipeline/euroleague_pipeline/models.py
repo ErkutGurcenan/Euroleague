@@ -169,6 +169,20 @@ class PbpEvent(Base):
     play_info: Mapped[Optional[str]] = mapped_column(String(120))
 
 
+class Award(Base):
+    """Season award winners (MVP etc.) — editorial data entered once a season."""
+
+    __tablename__ = "awards"
+    __table_args__ = (UniqueConstraint("season_code", "award"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    season_code: Mapped[str] = mapped_column(String(8), index=True)
+    award: Mapped[str] = mapped_column(String(60))
+    player_code: Mapped[str] = mapped_column(String(16))
+    club_code: Mapped[Optional[str]] = mapped_column(ForeignKey("clubs.code"))
+    display_order: Mapped[int] = mapped_column(Integer, default=0)
+
+
 class PersonStint(Base):
     """A person's stint at a club in a season (players, coaches, staff).
 
