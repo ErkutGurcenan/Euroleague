@@ -164,6 +164,8 @@ export type ShotPoint = {
   zone: string | null;
   fastbreak: boolean;
   gameCode: number;
+  home: boolean | null;
+  won: boolean | null;
 };
 
 export type BoxScoreLine = {

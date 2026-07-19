@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import GameCard from "@/components/GameCard";
-import { getClub } from "@/lib/api";
+import ShotChartExplorer from "@/components/ShotChartExplorer";
+import { getClub, getClubShots } from "@/lib/api";
 
 function age(birthDate: string | null): string {
   if (!birthDate) return "–";
@@ -19,9 +20,12 @@ export default async function TeamPage({
   params: Promise<{ code: string }>;
 }) {
   const { code } = await params;
-  let data;
+  let data, shotData;
   try {
-    data = await getClub(code.toUpperCase());
+    [data, shotData] = await Promise.all([
+      getClub(code.toUpperCase()),
+      getClubShots(code.toUpperCase()),
+    ]);
   } catch {
     notFound();
   }
@@ -100,6 +104,15 @@ export default async function TeamPage({
                 <div className="text-xs uppercase text-neutral-500">{label}</div>
               </div>
             ))}
+          </div>
+        </>
+      )}
+
+      {shotData.shots.length > 0 && (
+        <>
+          <h2 className="mb-3 text-lg font-semibold">Season shot chart</h2>
+          <div className="mb-8">
+            <ShotChartExplorer shots={shotData.shots} />
           </div>
         </>
       )}

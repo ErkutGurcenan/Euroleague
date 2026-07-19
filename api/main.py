@@ -680,10 +680,25 @@ def shots_payload(session, season: str, *, player: Optional[str] = None,
     if club:
         q = q.where(Shot.club_code == club)
     shots = session.execute(q).scalars().all()
-    return {
-        "season": season,
-        "total": len(shots),
-        "shots": [
+    games = {
+        gm.game_code: gm
+        for gm in session.execute(
+            select(Game).where(Game.season_code == season, Game.played)
+        ).scalars()
+    }
+
+    def context(s: Shot) -> tuple[Optional[bool], Optional[bool]]:
+        gm = games.get(s.game_code)
+        if not gm or gm.local_score is None or gm.road_score is None:
+            return None, None
+        home = gm.local_club_code == s.club_code
+        won = (gm.local_score > gm.road_score) == home
+        return home, won
+
+    payload = []
+    for s in shots:
+        home, won = context(s)
+        payload.append(
             {
                 "x": s.coord_x,
                 "y": s.coord_y,
@@ -692,10 +707,11 @@ def shots_payload(session, season: str, *, player: Optional[str] = None,
                 "zone": s.zone,
                 "fastbreak": s.fastbreak,
                 "gameCode": s.game_code,
+                "home": home,
+                "won": won,
             }
-            for s in shots
-        ],
-    }
+        )
+    return {"season": season, "total": len(shots), "shots": payload}
 
 
 @app.get("/api/players/{player_code}/shots")
