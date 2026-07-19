@@ -20,9 +20,12 @@ export default async function StandingsPage() {
               <th className="px-3 py-2">Team</th>
               <th className="px-3 py-2 text-right">W</th>
               <th className="px-3 py-2 text-right">L</th>
+              <th className="px-3 py-2 text-right">Home</th>
+              <th className="px-3 py-2 text-right">Away</th>
               <th className="px-3 py-2 text-right">PF</th>
               <th className="px-3 py-2 text-right">PA</th>
               <th className="px-3 py-2 text-right">+/−</th>
+              <th className="px-3 py-2">Form</th>
             </tr>
           </thead>
           <tbody>
@@ -31,7 +34,17 @@ export default async function StandingsPage() {
                 key={row.club.code}
                 className="border-t border-neutral-800/60 hover:bg-neutral-900/60"
               >
-                <td className="px-3 py-2 text-neutral-400">{row.position}</td>
+                <td
+                  className={`border-l-2 px-3 py-2 tabular-nums ${
+                    row.position <= 6
+                      ? "border-emerald-500 text-emerald-400"
+                      : row.position <= 10
+                        ? "border-amber-500 text-amber-400"
+                        : "border-transparent text-neutral-400"
+                  }`}
+                >
+                  {row.position}
+                </td>
                 <td className="px-3 py-2">
                   <Link
                     href={`/teams/${row.club.code}`}
@@ -54,6 +67,12 @@ export default async function StandingsPage() {
                 <td className="px-3 py-2 text-right text-neutral-400">
                   {row.gamesLost}
                 </td>
+                <td className="px-3 py-2 text-right tabular-nums text-neutral-400">
+                  {row.home}
+                </td>
+                <td className="px-3 py-2 text-right tabular-nums text-neutral-400">
+                  {row.away}
+                </td>
                 <td className="px-3 py-2 text-right text-neutral-400">
                   {row.pointsFavour}
                 </td>
@@ -67,13 +86,34 @@ export default async function StandingsPage() {
                 >
                   {row.pointsDiff > 0 ? `+${row.pointsDiff}` : row.pointsDiff}
                 </td>
+                <td className="px-3 py-2">
+                  <span className="flex gap-1">
+                    {row.form.map((r, i) => (
+                      <span
+                        key={i}
+                        title={r === "W" ? "Win" : "Loss"}
+                        className={`inline-block h-2 w-2 rounded-full ${
+                          r === "W" ? "bg-emerald-500" : "bg-red-500"
+                        }`}
+                      />
+                    ))}
+                  </span>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-      <p className="mt-3 text-xs text-neutral-500">
-        Top 6 qualify directly for the playoffs; 7–10 enter the play-in.
+      <p className="mt-3 flex items-center gap-4 text-xs text-neutral-500">
+        <span>
+          <span className="mr-1.5 inline-block h-2 w-2 rounded-sm bg-emerald-500" />
+          Playoffs (1–6)
+        </span>
+        <span>
+          <span className="mr-1.5 inline-block h-2 w-2 rounded-sm bg-amber-500" />
+          Play-In (7–10)
+        </span>
+        <span className="ml-auto">Form: last 5 games</span>
       </p>
     </div>
   );

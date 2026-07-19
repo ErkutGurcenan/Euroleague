@@ -20,6 +20,9 @@ export type StandingRow = {
   pointsAgainst: number;
   pointsDiff: number;
   qualified: boolean | null;
+  home: string;
+  away: string;
+  form: ("W" | "L")[];
 };
 
 export type GameSide = {

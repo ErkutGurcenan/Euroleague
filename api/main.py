@@ -132,6 +132,36 @@ def search(q: str = Query(min_length=2), season: str = DEFAULT_SEASON) -> dict:
         }
 
 
+def club_splits(session, season: str) -> dict[str, dict]:
+    """Home/away records and last-5 form per club from RS game results."""
+    games = session.execute(
+        select(Game)
+        .where(Game.season_code == season, Game.played, Game.phase_type == "RS")
+        .order_by(Game.utc_date)
+    ).scalars().all()
+    splits: dict[str, dict] = {}
+    for gm in games:
+        if gm.local_score is None or gm.road_score is None:
+            continue
+        for code, own, opp, at_home in (
+            (gm.local_club_code, gm.local_score, gm.road_score, True),
+            (gm.road_club_code, gm.road_score, gm.local_score, False),
+        ):
+            if not code:
+                continue
+            s = splits.setdefault(
+                code,
+                {"homeW": 0, "homeL": 0, "awayW": 0, "awayL": 0, "form": []},
+            )
+            won = own > opp
+            key = ("home" if at_home else "away") + ("W" if won else "L")
+            s[key] += 1
+            s["form"].append("W" if won else "L")
+    for s in splits.values():
+        s["form"] = s["form"][-5:]
+    return splits
+
+
 @app.get("/api/standings")
 def standings(season: str = DEFAULT_SEASON, round: Optional[int] = Query(None)) -> dict:
     with Session(engine) as session:
@@ -145,6 +175,7 @@ def standings(season: str = DEFAULT_SEASON, round: Optional[int] = Query(None)) 
         if rnd is None:
             raise HTTPException(404, f"no standings for season {season}")
         clubs = load_clubs(session)
+        splits = club_splits(session, season)
         rows = session.execute(
             select(StandingRow)
             .where(StandingRow.season_code == season, StandingRow.round == rnd)
@@ -164,6 +195,9 @@ def standings(season: str = DEFAULT_SEASON, round: Optional[int] = Query(None)) 
                     "pointsAgainst": r.points_against,
                     "pointsDiff": (r.points_favour or 0) - (r.points_against or 0),
                     "qualified": r.qualified,
+                    "home": f"{splits.get(r.club_code, {}).get('homeW', 0)}–{splits.get(r.club_code, {}).get('homeL', 0)}",
+                    "away": f"{splits.get(r.club_code, {}).get('awayW', 0)}–{splits.get(r.club_code, {}).get('awayL', 0)}",
+                    "form": splits.get(r.club_code, {}).get("form", []),
                 }
                 for r in rows
             ],
