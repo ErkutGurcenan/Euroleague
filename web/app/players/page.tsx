@@ -1,4 +1,7 @@
+export const metadata = { title: "Players" };
+
 import Link from "next/link";
+import Headshot from "@/components/Headshot";
 import { getPlayers, type PlayerSummary } from "@/lib/api";
 
 const SORTS: Record<string, { label: string; key: keyof PlayerSummary }> = {
@@ -64,8 +67,9 @@ export default async function PlayersPage({
                 <td className="px-3 py-2">
                   <Link
                     href={`/players/${p.playerCode}`}
-                    className="font-medium hover:text-orange-400"
+                    className="flex items-center gap-2 font-medium hover:text-orange-400"
                   >
+                    <Headshot src={p.imageUrl} name={p.name} size={24} />
                     {p.name}
                   </Link>
                 </td>

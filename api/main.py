@@ -19,6 +19,7 @@ from euroleague_pipeline.models import (  # noqa: E402
     Award,
     Club,
     Game,
+    PbpEvent,
     PersonStint,
     PlayerGameStat,
     Shot,
@@ -149,6 +150,7 @@ def search(q: str = Query(min_length=2), season: str = DEFAULT_SEASON) -> dict:
                 PersonStint.person_code,
                 func.max(PersonStint.name),
                 func.max(PersonStint.club_code),
+                func.max(PersonStint.image_url),
             )
             .where(
                 PersonStint.season_code == season,
@@ -165,12 +167,13 @@ def search(q: str = Query(min_length=2), season: str = DEFAULT_SEASON) -> dict:
                 {
                     "playerCode": code,
                     "name": name,
+                    "imageUrl": image_url,
                     "clubCode": club_code,
                     "clubName": club_map[club_code].name
                     if club_code in club_map
                     else None,
                 }
-                for code, name, club_code in players
+                for code, name, club_code, image_url in players
             ],
         }
 
@@ -295,6 +298,127 @@ def games(
         }
 
 
+_comeback_cache: dict[str, dict[int, int]] = {}
+
+
+def winner_max_deficits(session, season: str) -> dict[int, int]:
+    """Per game: the eventual winner's largest deficit, from the pbp
+    running score. Computed once per season and cached in-process."""
+    if season in _comeback_cache:
+        return _comeback_cache[season]
+    winners: dict[int, bool] = {}  # game_code -> home team won
+    for gm in session.execute(
+        select(Game).where(Game.season_code == season, Game.played)
+    ).scalars():
+        if gm.local_score is not None and gm.road_score is not None:
+            winners[gm.game_code] = gm.local_score > gm.road_score
+    deficits: dict[int, int] = {}
+    rows = session.execute(
+        select(
+            PbpEvent.game_code, PbpEvent.points_a, PbpEvent.points_b
+        )
+        .where(PbpEvent.season_code == season, PbpEvent.points_a.is_not(None))
+        .order_by(PbpEvent.game_code, PbpEvent.quarter, PbpEvent.play_number)
+    )
+    for game_code, pts_home, pts_road in rows:
+        home_won = winners.get(game_code)
+        if home_won is None or pts_home is None or pts_road is None:
+            continue
+        deficit = (pts_road - pts_home) if home_won else (pts_home - pts_road)
+        if deficit > deficits.get(game_code, 0):
+            deficits[game_code] = deficit
+    _comeback_cache[season] = deficits
+    return deficits
+
+
+@app.get("/api/games/notable")
+def notable_games(season: str = DEFAULT_SEASON, limit: int = 8) -> dict:
+    with Session(engine) as session:
+        clubs = load_clubs(session)
+        games = [
+            g
+            for g in session.execute(
+                select(Game).where(Game.season_code == season, Game.played)
+            ).scalars()
+            if g.local_score is not None and g.road_score is not None
+        ]
+        by_code = {g.game_code: g for g in games}
+
+        def entry(g: Game, value: int, note: Optional[str] = None) -> dict:
+            return {"game": game_dict(g, clubs), "value": value, "note": note}
+
+        margin = lambda g: abs(g.local_score - g.road_score)  # noqa: E731
+        total = lambda g: g.local_score + g.road_score  # noqa: E731
+
+        def ot_points(g: Game) -> int:
+            q = sum(
+                x or 0
+                for x in (g.local_q1, g.local_q2, g.local_q3, g.local_q4,
+                          g.road_q1, g.road_q2, g.road_q3, g.road_q4)
+            )
+            return total(g) - q
+
+        deficits = winner_max_deficits(session, season)
+        comebacks = sorted(deficits.items(), key=lambda kv: -kv[1])[:limit]
+
+        return {
+            "season": season,
+            "categories": [
+                {
+                    "key": "comebacks",
+                    "label": "Biggest comebacks",
+                    "entries": [
+                        entry(
+                            by_code[gc],
+                            d,
+                            f"won after trailing by {d}",
+                        )
+                        for gc, d in comebacks
+                        if gc in by_code
+                    ],
+                },
+                {
+                    "key": "blowouts",
+                    "label": "Biggest blowouts",
+                    "entries": [
+                        entry(g, margin(g), f"won by {margin(g)}")
+                        for g in sorted(games, key=margin, reverse=True)[:limit]
+                    ],
+                },
+                {
+                    "key": "closest",
+                    "label": "Closest finishes",
+                    "entries": [
+                        entry(g, margin(g), f"decided by {margin(g)}")
+                        for g in sorted(
+                            games, key=lambda g: (margin(g), -total(g))
+                        )[:limit]
+                    ],
+                },
+                {
+                    "key": "overtime",
+                    "label": "Overtime games",
+                    "entries": [
+                        entry(g, ot_points(g), f"{ot_points(g)} OT points")
+                        for g in sorted(
+                            (g for g in games if ot_points(g) > 0),
+                            key=ot_points,
+                            reverse=True,
+                        )[:limit]
+                    ],
+                },
+                {
+                    "key": "shootouts",
+                    "label": "Highest-scoring games",
+                    "entries": [
+                        entry(g, total(g), f"{total(g)} combined points")
+                        for g in sorted(games, key=total, reverse=True)[:limit]
+                    ],
+                },
+            ],
+        }
+
+
 @app.get("/api/games/{game_code}")
 def game_detail(game_code: int, season: str = DEFAULT_SEASON) -> dict:
     """Match page payload: quarters, both box scores, team totals."""
@@ -316,6 +440,13 @@ def game_detail(game_code: int, season: str = DEFAULT_SEASON) -> dict:
             .order_by(
                 PlayerGameStat.is_starter.desc(),
                 PlayerGameStat.seconds_played.desc(),
+            )
+        ).scalars().all()
+        game_shots = session.execute(
+            select(Shot).where(
+                Shot.season_code == season,
+                Shot.game_code == game_code,
+                Shot.action_id.in_(["2FGM", "2FGA", "3FGM", "3FGA"]),
             )
         ).scalars().all()
 
@@ -372,6 +503,21 @@ def game_detail(game_code: int, season: str = DEFAULT_SEASON) -> dict:
                 "overtime": (score - q_sum) if score and q_sum and score > q_sum else None,
                 "players": [player_line(l) for l in rows],
                 "totals": team_totals(rows),
+                "shots": [
+                    {
+                        "x": s.coord_x,
+                        "y": s.coord_y,
+                        "made": s.made,
+                        "three": s.action_id in ("3FGM", "3FGA"),
+                        "zone": s.zone,
+                        "fastbreak": s.fastbreak,
+                        "gameCode": s.game_code,
+                        "home": None,
+                        "won": None,
+                    }
+                    for s in game_shots
+                    if s.club_code == club_code
+                ],
             }
 
         a, b = game.local_club_code, game.road_club_code
@@ -486,6 +632,14 @@ def players_index(
             .group_by(g.player_code)
             .having(func.count() >= threshold)
         ).all()
+        images = {
+            code: url
+            for code, url in session.execute(
+                select(PersonStint.person_code, func.max(PersonStint.image_url))
+                .where(PersonStint.season_code == season, PersonStint.type == "J")
+                .group_by(PersonStint.person_code)
+            )
+        }
         # last club each player appeared for, for crest/label
         last_club: dict[str, str] = {}
         for pc, cc in session.execute(
@@ -506,6 +660,7 @@ def players_index(
                 {
                     "playerCode": code,
                     "name": name,
+                    "imageUrl": images.get(code),
                     "club": club_dict(club) if club else None,
                     "gamesPlayed": gp,
                     "minutes": round((secs or 0) / 60.0 / gp, 1),

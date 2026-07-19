@@ -108,6 +108,7 @@ export function getClubs() {
 export type PlayerSummary = {
   playerCode: string;
   name: string;
+  imageUrl: string | null;
   club: ClubSummary | null;
   gamesPlayed: number;
   minutes: number;
@@ -222,6 +223,7 @@ export type GameDetailSide = {
   overtime: number | null;
   players: BoxScoreLine[];
   totals: TeamTotals;
+  shots: ShotPoint[];
 };
 
 export type GameDetail = {
@@ -317,6 +319,19 @@ export function getHighs() {
   }>(`/api/highs`);
 }
 
+export type NotableEntry = {
+  game: Game;
+  value: number;
+  note: string | null;
+};
+
+export function getNotableGames() {
+  return get<{
+    season: string;
+    categories: { key: string; label: string; entries: NotableEntry[] }[];
+  }>(`/api/games/notable`);
+}
+
 export type AwardEntry = {
   award: string;
   playerCode: string;
@@ -335,6 +350,7 @@ export type SearchResults = {
   players: {
     playerCode: string;
     name: string;
+    imageUrl: string | null;
     clubCode: string | null;
     clubName: string | null;
   }[];

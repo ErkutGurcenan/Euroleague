@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import GameCard from "@/components/GameCard";
+import ShotChart from "@/components/ShotChart";
 import { getGame, type GameDetail, type GameDetailSide } from "@/lib/api";
 
 function seriesTally(game: GameDetail): string | null {
@@ -149,6 +150,24 @@ function TeamStatBar({
       <span className="w-20 text-right tabular-nums">{away}</span>
     </div>
   );
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ gameCode: string }>;
+}) {
+  const { gameCode } = await params;
+  try {
+    const g = await getGame(Number(gameCode));
+    const h = g.home.club?.abbreviatedName ?? g.home.club?.code;
+    const a = g.away.club?.abbreviatedName ?? g.away.club?.code;
+    return {
+      title: g.played ? `${h} ${g.home.score}–${g.away.score} ${a}` : `${h} vs ${a}`,
+    };
+  } catch {
+    return {};
+  }
 }
 
 export default async function GamePage({
@@ -304,6 +323,33 @@ export default async function GamePage({
 
           <BoxScoreTable side={home} />
           <BoxScoreTable side={away} />
+
+          {(home.shots.length > 0 || away.shots.length > 0) && (
+            <>
+              <h2 className="mb-3 text-lg font-semibold">Shot charts</h2>
+              <div className="mb-8 grid gap-8 lg:grid-cols-2">
+                {[home, away].map(
+                  (side, i) =>
+                    side.shots.length > 0 && (
+                      <div key={i}>
+                        <h3 className="mb-3 flex items-center gap-2 text-sm font-medium uppercase text-neutral-400">
+                          {side.club?.crestUrl && (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={side.club.crestUrl}
+                              alt=""
+                              className="h-5 w-5 object-contain"
+                            />
+                          )}
+                          {side.club?.name}
+                        </h3>
+                        <ShotChart shots={side.shots} />
+                      </div>
+                    ),
+                )}
+              </div>
+            </>
+          )}
         </>
       )}
 

@@ -1,3 +1,5 @@
+export const metadata = { title: "Season highs" };
+
 import Link from "next/link";
 import { getHighs } from "@/lib/api";
 

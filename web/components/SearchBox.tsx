@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Headshot from "@/components/Headshot";
 import type { SearchResults } from "@/lib/api";
 
 const EMPTY: SearchResults = { clubs: [], players: [] };
@@ -94,14 +95,17 @@ export default function SearchBox() {
             <button
               key={p.playerCode}
               onClick={() => go(`/players/${p.playerCode}`)}
-              className="block w-full px-3 py-1.5 text-left text-sm hover:bg-neutral-800"
+              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-neutral-800"
             >
-              {p.name}
-              {p.clubName && (
-                <span className="ml-1 text-xs text-neutral-500">
-                  {p.clubName}
-                </span>
-              )}
+              <Headshot src={p.imageUrl} name={p.name} size={20} />
+              <span className="min-w-0 truncate">
+                {p.name}
+                {p.clubName && (
+                  <span className="ml-1 text-xs text-neutral-500">
+                    {p.clubName}
+                  </span>
+                )}
+              </span>
             </button>
           ))}
         </div>
