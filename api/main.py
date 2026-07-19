@@ -370,9 +370,22 @@ def game_detail(game_code: int, season: str = DEFAULT_SEASON) -> dict:
                 "totals": team_totals(rows),
             }
 
+        a, b = game.local_club_code, game.road_club_code
+        meetings = session.execute(
+            select(Game)
+            .where(
+                Game.season_code == season,
+                Game.id != game.id,
+                ((Game.local_club_code == a) & (Game.road_club_code == b))
+                | ((Game.local_club_code == b) & (Game.road_club_code == a)),
+            )
+            .order_by(Game.utc_date)
+        ).scalars().all()
+
         return {
             "season": season,
             "gameCode": game_code,
+            "headToHead": [game_dict(m, clubs) for m in meetings],
             "round": game.round,
             "roundName": game.round_name,
             "phaseType": game.phase_type,
@@ -667,10 +680,25 @@ def shots_payload(session, season: str, *, player: Optional[str] = None,
     if club:
         q = q.where(Shot.club_code == club)
     shots = session.execute(q).scalars().all()
-    return {
-        "season": season,
-        "total": len(shots),
-        "shots": [
+    games = {
+        gm.game_code: gm
+        for gm in session.execute(
+            select(Game).where(Game.season_code == season, Game.played)
+        ).scalars()
+    }
+
+    def context(s: Shot) -> tuple[Optional[bool], Optional[bool]]:
+        gm = games.get(s.game_code)
+        if not gm or gm.local_score is None or gm.road_score is None:
+            return None, None
+        home = gm.local_club_code == s.club_code
+        won = (gm.local_score > gm.road_score) == home
+        return home, won
+
+    payload = []
+    for s in shots:
+        home, won = context(s)
+        payload.append(
             {
                 "x": s.coord_x,
                 "y": s.coord_y,
@@ -679,10 +707,11 @@ def shots_payload(session, season: str, *, player: Optional[str] = None,
                 "zone": s.zone,
                 "fastbreak": s.fastbreak,
                 "gameCode": s.game_code,
+                "home": home,
+                "won": won,
             }
-            for s in shots
-        ],
-    }
+        )
+    return {"season": season, "total": len(shots), "shots": payload}
 
 
 @app.get("/api/players/{player_code}/shots")
@@ -772,6 +801,51 @@ def club_detail(code: str, season: str = DEFAULT_SEASON) -> dict:
             )
             .order_by(PersonStint.dorsal)
         ).scalars()
+        coaches = session.execute(
+            select(PersonStint)
+            .where(
+                PersonStint.season_code == season,
+                PersonStint.club_code == code,
+                PersonStint.type.in_(["E", "A"]),  # E = head coach, A = assistant
+            )
+            .order_by(PersonStint.type, PersonStint.start_date)
+        ).scalars().all()
+        g = PlayerGameStat
+        player_stats = {
+            row[0]: row
+            for row in session.execute(
+                select(
+                    g.player_code,
+                    func.count(),
+                    func.sum(g.seconds_played),
+                    func.sum(g.points),
+                    func.sum(g.treb),
+                    func.sum(g.ast),
+                    func.sum(g.pir),
+                )
+                .where(
+                    g.season_code == season,
+                    g.club_code == code,  # only games for THIS club (transfers)
+                )
+                .group_by(g.player_code)
+            )
+        }
+
+        def roster_stats(person_code: str) -> dict:
+            row = player_stats.get(person_code)
+            if not row:
+                return {"gamesPlayed": 0, "minutes": None, "points": None,
+                        "rebounds": None, "assists": None, "pir": None}
+            _, gp, secs, pts, reb, ast, pir = row
+            per = lambda total: round((total or 0) / gp, 1)  # noqa: E731
+            return {
+                "gamesPlayed": gp,
+                "minutes": round((secs or 0) / 60.0 / gp, 1),
+                "points": per(pts),
+                "rebounds": per(reb),
+                "assists": per(ast),
+                "pir": per(pir),
+            }
         games_q = session.execute(
             select(Game)
             .where(
@@ -783,6 +857,14 @@ def club_detail(code: str, season: str = DEFAULT_SEASON) -> dict:
         return {
             "club": club_dict(club),
             "stats": club_season_stats(session, code, season),
+            "coaches": [
+                {
+                    "name": c.name,
+                    "role": "Head coach" if c.type == "E" else "Assistant coach",
+                    "active": c.active,
+                }
+                for c in coaches
+            ],
             "roster": [
                 {
                     "personCode": p.person_code,
@@ -793,6 +875,7 @@ def club_detail(code: str, season: str = DEFAULT_SEASON) -> dict:
                     "birthDate": p.birth_date.date().isoformat() if p.birth_date else None,
                     "country": p.country_name,
                     "active": p.active,
+                    **roster_stats(p.person_code),
                 }
                 for p in roster
             ],

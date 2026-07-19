@@ -26,6 +26,10 @@ const RESTRICTED_ARC = arcPoints(125, 90, 24);
 export default function ShotChart({ shots }: { shots: ShotPoint[] }) {
   const visible = shots.filter((s) => s.y <= 1050 && Math.abs(s.x) <= 750);
   const made = visible.filter((s) => s.made).length;
+  // season-aggregate charts have thousands of shots — shrink and fade dots
+  const dense = visible.length > 600;
+  const dotR = dense ? 7 : 12;
+  const dotOpacity = dense ? 0.45 : 0.8;
 
   return (
     <div>
@@ -64,11 +68,11 @@ export default function ShotChart({ shots }: { shots: ShotPoint[] }) {
             key={i}
             cx={s.x}
             cy={flip(s.y)}
-            r={12}
+            r={dotR}
             fill={s.made ? "#10b981" : "none"}
             stroke={s.made ? "none" : "#f87171"}
-            strokeWidth={4.5}
-            opacity={0.8}
+            strokeWidth={dense ? 3 : 4.5}
+            opacity={dotOpacity}
           />
         ))}
       </svg>

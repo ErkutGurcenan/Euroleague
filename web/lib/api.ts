@@ -54,6 +54,12 @@ export type RosterEntry = {
   birthDate: string | null;
   country: string | null;
   active: boolean | null;
+  gamesPlayed: number;
+  minutes: number | null;
+  points: number | null;
+  rebounds: number | null;
+  assists: number | null;
+  pir: number | null;
 };
 
 async function get<T>(path: string): Promise<T> {
@@ -158,6 +164,8 @@ export type ShotPoint = {
   zone: string | null;
   fastbreak: boolean;
   gameCode: number;
+  home: boolean | null;
+  won: boolean | null;
 };
 
 export type BoxScoreLine = {
@@ -208,6 +216,7 @@ export type GameDetailSide = {
 export type GameDetail = {
   season: string;
   gameCode: number;
+  headToHead: Game[];
   round: number | null;
   roundName: string | null;
   phaseType: string | null;
@@ -263,10 +272,17 @@ export type TeamSeasonStats = {
   ftPct: number | null;
 };
 
+export type CoachEntry = {
+  name: string | null;
+  role: string;
+  active: boolean | null;
+};
+
 export function getClub(code: string) {
   return get<{
     club: ClubSummary;
     stats: TeamSeasonStats | null;
+    coaches: CoachEntry[];
     roster: RosterEntry[];
     games: Game[];
   }>(`/api/clubs/${code}`);

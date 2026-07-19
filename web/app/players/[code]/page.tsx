@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import ShotChart from "@/components/ShotChart";
-import ZoneChart from "@/components/ZoneChart";
+import ShotChartExplorer from "@/components/ShotChartExplorer";
 import { getPlayer, getPlayerShots } from "@/lib/api";
 
 function StatCard({ label, value }: { label: string; value: string | number }) {
@@ -76,19 +75,8 @@ export default async function PlayerPage({
         <StatCard label="3P%" value={a.fg3Pct ?? "–"} />
         <StatCard label="FT%" value={a.ftPct ?? "–"} />
       </div>
-      <div className="mb-8 grid gap-8 lg:grid-cols-2">
-        <div>
-          <h3 className="mb-3 text-sm font-medium uppercase text-neutral-400">
-            Shot chart
-          </h3>
-          <ShotChart shots={shotData.shots} />
-        </div>
-        <div>
-          <h3 className="mb-3 text-sm font-medium uppercase text-neutral-400">
-            Hot zones
-          </h3>
-          <ZoneChart shots={shotData.shots} />
-        </div>
+      <div className="mb-8">
+        <ShotChartExplorer shots={shotData.shots} />
       </div>
 
       <h2 className="mb-3 text-lg font-semibold">Game log</h2>

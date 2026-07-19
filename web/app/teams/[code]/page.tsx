@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import GameCard from "@/components/GameCard";
-import { getClub } from "@/lib/api";
+import ShotChartExplorer from "@/components/ShotChartExplorer";
+import { getClub, getClubShots } from "@/lib/api";
 
 function age(birthDate: string | null): string {
   if (!birthDate) return "–";
@@ -19,13 +20,20 @@ export default async function TeamPage({
   params: Promise<{ code: string }>;
 }) {
   const { code } = await params;
-  let data;
+  let data, shotData;
   try {
-    data = await getClub(code.toUpperCase());
+    [data, shotData] = await Promise.all([
+      getClub(code.toUpperCase()),
+      getClubShots(code.toUpperCase()),
+    ]);
   } catch {
     notFound();
   }
-  const { club, stats, roster, games } = data;
+  const { club, stats, coaches, roster, games } = data;
+  const headCoach = coaches.find((c) => c.role === "Head coach" && c.active);
+  const assistants = coaches.filter(
+    (c) => c.role === "Assistant coach" && c.active,
+  );
   const activeRoster = roster.filter((p) => p.active);
   const results = games.filter((g) => g.played);
   const upcoming = games.filter((g) => !g.played);
@@ -56,6 +64,19 @@ export default async function TeamPage({
               </>
             )}
           </p>
+          {headCoach && (
+            <p className="mt-0.5 text-sm text-neutral-400">
+              Head coach:{" "}
+              <span className="text-neutral-200">{headCoach.name}</span>
+              {assistants.length > 0 && (
+                <span className="text-neutral-500">
+                  {" "}
+                  · Assistants:{" "}
+                  {assistants.map((a) => a.name).join(", ")}
+                </span>
+              )}
+            </p>
+          )}
         </div>
       </div>
 
@@ -87,6 +108,15 @@ export default async function TeamPage({
         </>
       )}
 
+      {shotData.shots.length > 0 && (
+        <>
+          <h2 className="mb-3 text-lg font-semibold">Season shot chart</h2>
+          <div className="mb-8">
+            <ShotChartExplorer shots={shotData.shots} />
+          </div>
+        </>
+      )}
+
       <h2 className="mb-3 text-lg font-semibold">Roster</h2>
       <div className="mb-8 overflow-x-auto rounded-lg border border-neutral-800">
         <table className="w-full text-sm">
@@ -97,7 +127,12 @@ export default async function TeamPage({
               <th className="px-3 py-2">Position</th>
               <th className="px-3 py-2 text-right">Height</th>
               <th className="px-3 py-2 text-right">Age</th>
-              <th className="px-3 py-2">Country</th>
+              <th className="px-2 py-2 text-right">GP</th>
+              <th className="px-2 py-2 text-right">Min</th>
+              <th className="px-2 py-2 text-right">Pts</th>
+              <th className="px-2 py-2 text-right">Reb</th>
+              <th className="px-2 py-2 text-right">Ast</th>
+              <th className="px-2 py-2 text-right">PIR</th>
             </tr>
           </thead>
           <tbody>
@@ -126,7 +161,24 @@ export default async function TeamPage({
                 <td className="px-3 py-2 text-right text-neutral-400">
                   {age(p.birthDate)}
                 </td>
-                <td className="px-3 py-2 text-neutral-400">{p.country}</td>
+                <td className="px-2 py-2 text-right tabular-nums text-neutral-400">
+                  {p.gamesPlayed || "–"}
+                </td>
+                <td className="px-2 py-2 text-right tabular-nums text-neutral-400">
+                  {p.minutes ?? "–"}
+                </td>
+                <td className="px-2 py-2 text-right font-medium tabular-nums">
+                  {p.points ?? "–"}
+                </td>
+                <td className="px-2 py-2 text-right tabular-nums">
+                  {p.rebounds ?? "–"}
+                </td>
+                <td className="px-2 py-2 text-right tabular-nums">
+                  {p.assists ?? "–"}
+                </td>
+                <td className="px-2 py-2 text-right tabular-nums">
+                  {p.pir ?? "–"}
+                </td>
               </tr>
             ))}
           </tbody>
