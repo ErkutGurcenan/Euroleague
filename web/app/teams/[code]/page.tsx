@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import GameCard from "@/components/GameCard";
 import { getClub } from "@/lib/api";
@@ -80,7 +81,14 @@ export default async function TeamPage({
                 <td className="px-3 py-2 tabular-nums text-neutral-400">
                   {p.dorsal ?? "–"}
                 </td>
-                <td className="px-3 py-2 font-medium">{p.name}</td>
+                <td className="px-3 py-2 font-medium">
+                  <Link
+                    href={`/players/${p.personCode}`}
+                    className="hover:text-orange-400"
+                  >
+                    {p.name}
+                  </Link>
+                </td>
                 <td className="px-3 py-2 text-neutral-400">
                   {p.positionName ?? "–"}
                 </td>

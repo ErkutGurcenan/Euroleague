@@ -16,7 +16,7 @@ function Side({ side, won }: { side: GameSide; won: boolean }) {
       </Link>
       <span
         className={`text-sm tabular-nums ${
-          won ? "font-bold text-white" : "text-neutral-400"
+          won ? "font-bold text-white" : "text-neutral-200"
         }`}
       >
         {side.score ?? "–"}
@@ -42,10 +42,13 @@ export default function GameCard({ game }: { game: Game }) {
 
   return (
     <div className="rounded-lg border border-neutral-800 bg-neutral-900/40 p-3">
-      <div className="mb-2 flex justify-between text-xs text-neutral-500">
+      <Link
+        href={`/games/${game.gameCode}`}
+        className="mb-2 flex justify-between text-xs text-neutral-500 hover:text-orange-400"
+      >
         <span>{game.phaseType === "RS" ? game.roundName : game.groupName}</span>
-        <span>{date} UTC</span>
-      </div>
+        <span>{date} UTC →</span>
+      </Link>
       <div className="space-y-1.5">
         <Side side={game.home} won={homeWon} />
         <Side side={game.away} won={awayWon} />

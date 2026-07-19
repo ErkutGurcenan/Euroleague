@@ -15,7 +15,14 @@ from sqlalchemy import create_engine, func, select
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "pipeline"))
 
-from euroleague_pipeline.models import Club, Game, PersonStint, StandingRow  # noqa: E402
+from euroleague_pipeline.models import (  # noqa: E402
+    Club,
+    Game,
+    PersonStint,
+    PlayerGameStat,
+    Shot,
+    StandingRow,
+)
 
 DB_PATH = REPO_ROOT / "db" / "euroleague.db"
 engine = create_engine(f"sqlite:///{DB_PATH}", connect_args={"check_same_thread": False})
@@ -55,6 +62,7 @@ def game_dict(g: Game, clubs: dict[str, Club]) -> dict:
 
     return {
         "id": g.id,
+        "gameCode": g.game_code,
         "round": g.round,
         "roundName": g.round_name,
         "phaseType": g.phase_type,
@@ -160,11 +168,329 @@ def games(
         }
 
 
+@app.get("/api/games/{game_code}")
+def game_detail(game_code: int, season: str = DEFAULT_SEASON) -> dict:
+    """Match page payload: quarters, both box scores, team totals."""
+    with Session(engine) as session:
+        game = session.execute(
+            select(Game).where(
+                Game.season_code == season, Game.game_code == game_code
+            )
+        ).scalar_one_or_none()
+        if game is None:
+            raise HTTPException(404, f"unknown game {game_code}")
+        clubs = load_clubs(session)
+        lines = session.execute(
+            select(PlayerGameStat)
+            .where(
+                PlayerGameStat.season_code == season,
+                PlayerGameStat.game_code == game_code,
+            )
+            .order_by(
+                PlayerGameStat.is_starter.desc(),
+                PlayerGameStat.seconds_played.desc(),
+            )
+        ).scalars().all()
+
+        def player_line(s: PlayerGameStat) -> dict:
+            return {
+                "playerCode": s.player_code,
+                "name": s.player_name,
+                "dorsal": s.dorsal,
+                "isStarter": s.is_starter,
+                "minutes": round((s.seconds_played or 0) / 60.0, 1),
+                "points": s.points,
+                "fg2": f"{s.fg2m}/{s.fg2a}",
+                "fg3": f"{s.fg3m}/{s.fg3a}",
+                "ft": f"{s.ftm}/{s.fta}",
+                "oreb": s.oreb,
+                "dreb": s.dreb,
+                "rebounds": s.treb,
+                "assists": s.ast,
+                "steals": s.stl,
+                "turnovers": s.tov,
+                "blocks": s.blk,
+                "fouls": s.fouls_committed,
+                "pir": s.pir,
+                "plusMinus": s.plus_minus,
+            }
+
+        def team_totals(rows: list[PlayerGameStat]) -> dict:
+            def tot(attr: str) -> int:
+                return sum(getattr(r, attr) or 0 for r in rows)
+
+            return {
+                "points": tot("points"),
+                "fg2m": tot("fg2m"), "fg2a": tot("fg2a"),
+                "fg3m": tot("fg3m"), "fg3a": tot("fg3a"),
+                "ftm": tot("ftm"), "fta": tot("fta"),
+                "fg2Pct": pct(tot("fg2m"), tot("fg2a")),
+                "fg3Pct": pct(tot("fg3m"), tot("fg3a")),
+                "ftPct": pct(tot("ftm"), tot("fta")),
+                "oreb": tot("oreb"), "dreb": tot("dreb"), "rebounds": tot("treb"),
+                "assists": tot("ast"), "steals": tot("stl"),
+                "turnovers": tot("tov"), "blocks": tot("blk"),
+                "fouls": tot("fouls_committed"), "pir": tot("pir"),
+            }
+
+        def side(club_code: Optional[str], score: Optional[int],
+                 quarters: list[Optional[int]]) -> dict:
+            club = clubs.get(club_code) if club_code else None
+            rows = [l for l in lines if l.club_code == club_code]
+            q_sum = sum(q or 0 for q in quarters)
+            return {
+                "club": club_dict(club) if club else None,
+                "score": score,
+                "quarters": quarters,
+                "overtime": (score - q_sum) if score and q_sum and score > q_sum else None,
+                "players": [player_line(l) for l in rows],
+                "totals": team_totals(rows),
+            }
+
+        return {
+            "season": season,
+            "gameCode": game_code,
+            "round": game.round,
+            "roundName": game.round_name,
+            "phaseType": game.phase_type,
+            "groupName": game.group_name,
+            "played": game.played,
+            "utcDate": game.utc_date.isoformat() + "Z" if game.utc_date else None,
+            "home": side(
+                game.local_club_code,
+                game.local_score,
+                [game.local_q1, game.local_q2, game.local_q3, game.local_q4],
+            ),
+            "away": side(
+                game.road_club_code,
+                game.road_score,
+                [game.road_q1, game.road_q2, game.road_q3, game.road_q4],
+            ),
+        }
+
+
 @app.get("/api/clubs")
 def clubs_index(season: str = DEFAULT_SEASON) -> dict:
     with Session(engine) as session:
         rows = session.execute(select(Club).order_by(Club.name)).scalars()
         return {"clubs": [club_dict(c) for c in rows]}
+
+
+def pct(made, attempted) -> Optional[float]:
+    if not attempted:
+        return None
+    return round(100.0 * (made or 0) / attempted, 1)
+
+
+@app.get("/api/players")
+def players_index(
+    season: str = DEFAULT_SEASON, min_games: Optional[int] = Query(None)
+) -> dict:
+    """Season leaderboard aggregated from box scores (per-game averages).
+
+    Default games threshold adapts to how much of the season is ingested,
+    so the leaderboard is never empty during a backfill.
+    """
+    g = PlayerGameStat
+    with Session(engine) as session:
+        max_gp = (
+            session.execute(
+                select(func.count())
+                .where(g.season_code == season)
+                .group_by(g.player_code)
+                .order_by(func.count().desc())
+                .limit(1)
+            ).scalar()
+            or 0
+        )
+        threshold = min_games if min_games is not None else max(1, max_gp // 2)
+        rows = session.execute(
+            select(
+                g.player_code,
+                func.max(g.player_name),
+                func.count().label("gp"),
+                func.sum(g.seconds_played),
+                func.sum(g.points),
+                func.sum(g.fg2m), func.sum(g.fg2a),
+                func.sum(g.fg3m), func.sum(g.fg3a),
+                func.sum(g.ftm), func.sum(g.fta),
+                func.sum(g.treb), func.sum(g.ast), func.sum(g.stl),
+                func.sum(g.tov), func.sum(g.blk), func.sum(g.pir),
+            )
+            .where(g.season_code == season)
+            .group_by(g.player_code)
+            .having(func.count() >= threshold)
+        ).all()
+        # last club each player appeared for, for crest/label
+        last_club: dict[str, str] = {}
+        for pc, cc in session.execute(
+            select(g.player_code, g.club_code)
+            .where(g.season_code == season)
+            .order_by(g.game_code)
+        ):
+            last_club[pc] = cc
+        clubs = load_clubs(session)
+
+        players = []
+        for (
+            code, name, gp, secs, pts, fg2m, fg2a, fg3m, fg3a,
+            ftm, fta, treb, ast, stl, tov, blk, pir,
+        ) in rows:
+            club = clubs.get(last_club.get(code, ""))
+            players.append(
+                {
+                    "playerCode": code,
+                    "name": name,
+                    "club": club_dict(club) if club else None,
+                    "gamesPlayed": gp,
+                    "minutes": round((secs or 0) / 60.0 / gp, 1),
+                    "points": round((pts or 0) / gp, 1),
+                    "rebounds": round((treb or 0) / gp, 1),
+                    "assists": round((ast or 0) / gp, 1),
+                    "steals": round((stl or 0) / gp, 1),
+                    "turnovers": round((tov or 0) / gp, 1),
+                    "blocks": round((blk or 0) / gp, 1),
+                    "pir": round((pir or 0) / gp, 1),
+                    "fg2Pct": pct(fg2m, fg2a),
+                    "fg3Pct": pct(fg3m, fg3a),
+                    "ftPct": pct(ftm, fta),
+                }
+            )
+        players.sort(key=lambda p: -p["pir"])
+        return {"season": season, "minGames": threshold, "players": players}
+
+
+@app.get("/api/players/{player_code}")
+def player_detail(player_code: str, season: str = DEFAULT_SEASON) -> dict:
+    g = PlayerGameStat
+    with Session(engine) as session:
+        stats = session.execute(
+            select(g)
+            .where(g.season_code == season, g.player_code == player_code)
+            .order_by(g.game_code)
+        ).scalars().all()
+        if not stats:
+            raise HTTPException(404, f"no games for player {player_code}")
+        stint = session.execute(
+            select(PersonStint)
+            .where(
+                PersonStint.season_code == season,
+                PersonStint.person_code == player_code,
+            )
+            .order_by(PersonStint.start_date.desc())
+        ).scalars().first()
+        clubs = load_clubs(session)
+        games_by_code = {
+            gm.game_code: gm
+            for gm in session.execute(
+                select(Game).where(
+                    Game.season_code == season,
+                    Game.game_code.in_([s.game_code for s in stats]),
+                )
+            ).scalars()
+        }
+
+        def log_entry(s: PlayerGameStat) -> dict:
+            gm = games_by_code.get(s.game_code)
+            opp_code = None
+            home = None
+            if gm:
+                home = gm.local_club_code == s.club_code
+                opp_code = gm.road_club_code if home else gm.local_club_code
+            opp = clubs.get(opp_code) if opp_code else None
+            return {
+                "gameCode": s.game_code,
+                "round": gm.round if gm else None,
+                "utcDate": gm.utc_date.isoformat() + "Z" if gm and gm.utc_date else None,
+                "home": home,
+                "opponent": club_dict(opp) if opp else None,
+                "minutes": round((s.seconds_played or 0) / 60.0, 1),
+                "points": s.points,
+                "rebounds": s.treb,
+                "assists": s.ast,
+                "steals": s.stl,
+                "blocks": s.blk,
+                "turnovers": s.tov,
+                "pir": s.pir,
+                "plusMinus": s.plus_minus,
+                "fg2": f"{s.fg2m}/{s.fg2a}",
+                "fg3": f"{s.fg3m}/{s.fg3a}",
+                "ft": f"{s.ftm}/{s.fta}",
+            }
+
+        gp = len(stats)
+        club = clubs.get(stats[-1].club_code)
+        return {
+            "playerCode": player_code,
+            "name": stats[-1].player_name,
+            "club": club_dict(club) if club else None,
+            "dorsal": stint.dorsal if stint else stats[-1].dorsal,
+            "positionName": stint.position_name if stint else None,
+            "heightCm": stint.height_cm if stint else None,
+            "birthDate": stint.birth_date.date().isoformat()
+            if stint and stint.birth_date
+            else None,
+            "country": stint.country_name if stint else None,
+            "imageUrl": stint.image_url if stint else None,
+            "averages": {
+                "gamesPlayed": gp,
+                "minutes": round(sum(s.seconds_played or 0 for s in stats) / 60 / gp, 1),
+                "points": round(sum(s.points or 0 for s in stats) / gp, 1),
+                "rebounds": round(sum(s.treb or 0 for s in stats) / gp, 1),
+                "assists": round(sum(s.ast or 0 for s in stats) / gp, 1),
+                "pir": round(sum(s.pir or 0 for s in stats) / gp, 1),
+                "fg2Pct": pct(
+                    sum(s.fg2m or 0 for s in stats), sum(s.fg2a or 0 for s in stats)
+                ),
+                "fg3Pct": pct(
+                    sum(s.fg3m or 0 for s in stats), sum(s.fg3a or 0 for s in stats)
+                ),
+                "ftPct": pct(
+                    sum(s.ftm or 0 for s in stats), sum(s.fta or 0 for s in stats)
+                ),
+            },
+            "gameLog": [log_entry(s) for s in stats],
+        }
+
+
+def shots_payload(session, season: str, *, player: Optional[str] = None,
+                  club: Optional[str] = None) -> dict:
+    q = select(Shot).where(
+        Shot.season_code == season, Shot.action_id.in_(["2FGM", "2FGA", "3FGM", "3FGA"])
+    )
+    if player:
+        q = q.where(Shot.player_code == player)
+    if club:
+        q = q.where(Shot.club_code == club)
+    shots = session.execute(q).scalars().all()
+    return {
+        "season": season,
+        "total": len(shots),
+        "shots": [
+            {
+                "x": s.coord_x,
+                "y": s.coord_y,
+                "made": s.made,
+                "three": s.action_id in ("3FGM", "3FGA"),
+                "zone": s.zone,
+                "fastbreak": s.fastbreak,
+                "gameCode": s.game_code,
+            }
+            for s in shots
+        ],
+    }
+
+
+@app.get("/api/players/{player_code}/shots")
+def player_shots(player_code: str, season: str = DEFAULT_SEASON) -> dict:
+    with Session(engine) as session:
+        return shots_payload(session, season, player=player_code)
+
+
+@app.get("/api/clubs/{code}/shots")
+def club_shots(code: str, season: str = DEFAULT_SEASON) -> dict:
+    with Session(engine) as session:
+        return shots_payload(session, season, club=code)
 
 
 @app.get("/api/clubs/{code}")

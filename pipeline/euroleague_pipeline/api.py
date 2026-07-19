@@ -49,3 +49,44 @@ class EuroleagueApi:
 
     def standings(self, season: str, round_: int) -> list[dict]:
         return self._get(f"/seasons/{season}/rounds/{round_}/standings")
+
+
+LIVE_BASE_URL = "https://live.euroleague.net/api"
+LIVE_REQUEST_DELAY_S = 1.5  # live API rate-limits aggressively
+LIVE_MAX_RETRIES = 6
+
+
+class EuroleagueLiveApi:
+    """Client for the per-game feeds (box scores, shots, play-by-play)."""
+
+    def __init__(self) -> None:
+        self.session = requests.Session()
+        self.session.headers["Accept"] = "application/json"
+
+    def _get(self, endpoint: str, season: str, game_code: int) -> Any:
+        backoff = 15.0
+        for attempt in range(LIVE_MAX_RETRIES):
+            resp = self.session.get(
+                f"{LIVE_BASE_URL}/{endpoint}",
+                params={"gamecode": game_code, "seasoncode": season},
+                timeout=30,
+            )
+            if resp.status_code == 429:
+                retry_after = float(resp.headers.get("Retry-After") or backoff)
+                time.sleep(max(retry_after, backoff))
+                backoff *= 2
+                continue
+            resp.raise_for_status()
+            time.sleep(LIVE_REQUEST_DELAY_S)
+            return resp.json()
+        resp.raise_for_status()
+        raise RuntimeError("unreachable")
+
+    def boxscore(self, season: str, game_code: int) -> dict:
+        return self._get("Boxscore", season, game_code)
+
+    def shots(self, season: str, game_code: int) -> dict:
+        return self._get("Points", season, game_code)
+
+    def play_by_play(self, season: str, game_code: int) -> dict:
+        return self._get("PlayByPlay", season, game_code)

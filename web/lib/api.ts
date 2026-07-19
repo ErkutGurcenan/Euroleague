@@ -31,6 +31,7 @@ export type GameSide = {
 
 export type Game = {
   id: string;
+  gameCode: number;
   round: number | null;
   roundName: string | null;
   phaseType: string | null;
@@ -77,6 +78,162 @@ export function getGames(params?: { round?: number; club?: string }) {
 
 export function getClubs() {
   return get<{ clubs: ClubSummary[] }>(`/api/clubs`);
+}
+
+export type PlayerSummary = {
+  playerCode: string;
+  name: string;
+  club: ClubSummary | null;
+  gamesPlayed: number;
+  minutes: number;
+  points: number;
+  rebounds: number;
+  assists: number;
+  steals: number;
+  turnovers: number;
+  blocks: number;
+  pir: number;
+  fg2Pct: number | null;
+  fg3Pct: number | null;
+  ftPct: number | null;
+};
+
+export type GameLogEntry = {
+  gameCode: number;
+  round: number | null;
+  utcDate: string | null;
+  home: boolean | null;
+  opponent: ClubSummary | null;
+  minutes: number;
+  points: number;
+  rebounds: number;
+  assists: number;
+  steals: number;
+  blocks: number;
+  turnovers: number;
+  pir: number;
+  plusMinus: number | null;
+  fg2: string;
+  fg3: string;
+  ft: string;
+};
+
+export type PlayerDetail = {
+  playerCode: string;
+  name: string;
+  club: ClubSummary | null;
+  dorsal: string | null;
+  positionName: string | null;
+  heightCm: number | null;
+  birthDate: string | null;
+  country: string | null;
+  imageUrl: string | null;
+  averages: {
+    gamesPlayed: number;
+    minutes: number;
+    points: number;
+    rebounds: number;
+    assists: number;
+    pir: number;
+    fg2Pct: number | null;
+    fg3Pct: number | null;
+    ftPct: number | null;
+  };
+  gameLog: GameLogEntry[];
+};
+
+export type ShotPoint = {
+  x: number;
+  y: number;
+  made: boolean;
+  three: boolean;
+  zone: string | null;
+  fastbreak: boolean;
+  gameCode: number;
+};
+
+export type BoxScoreLine = {
+  playerCode: string;
+  name: string | null;
+  dorsal: string | null;
+  isStarter: boolean;
+  minutes: number;
+  points: number;
+  fg2: string;
+  fg3: string;
+  ft: string;
+  oreb: number;
+  dreb: number;
+  rebounds: number;
+  assists: number;
+  steals: number;
+  turnovers: number;
+  blocks: number;
+  fouls: number;
+  pir: number;
+  plusMinus: number | null;
+};
+
+export type TeamTotals = {
+  points: number;
+  fg2m: number; fg2a: number;
+  fg3m: number; fg3a: number;
+  ftm: number; fta: number;
+  fg2Pct: number | null;
+  fg3Pct: number | null;
+  ftPct: number | null;
+  oreb: number; dreb: number; rebounds: number;
+  assists: number; steals: number;
+  turnovers: number; blocks: number;
+  fouls: number; pir: number;
+};
+
+export type GameDetailSide = {
+  club: ClubSummary | null;
+  score: number | null;
+  quarters: (number | null)[];
+  overtime: number | null;
+  players: BoxScoreLine[];
+  totals: TeamTotals;
+};
+
+export type GameDetail = {
+  season: string;
+  gameCode: number;
+  round: number | null;
+  roundName: string | null;
+  phaseType: string | null;
+  groupName: string | null;
+  played: boolean;
+  utcDate: string | null;
+  home: GameDetailSide;
+  away: GameDetailSide;
+};
+
+export function getGame(gameCode: number) {
+  return get<GameDetail>(`/api/games/${gameCode}`);
+}
+
+export function getPlayers() {
+  return get<{ season: string; minGames: number; players: PlayerSummary[] }>(
+    `/api/players`,
+  );
+}
+
+export function getPlayer(code: string) {
+  return get<PlayerDetail>(`/api/players/${code}`);
+}
+
+export function getPlayerShots(code: string) {
+  return get<{ season: string; total: number; shots: ShotPoint[] }>(
+    `/api/players/${code}/shots`,
+  );
+}
+
+export function getClubShots(code: string) {
+  return get<{ season: string; total: number; shots: ShotPoint[] }>(
+    `/api/clubs/${code}/shots`,
+  );
 }
 
 export function getClub(code: string) {

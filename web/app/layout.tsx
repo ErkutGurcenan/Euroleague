@@ -22,6 +22,7 @@ const navLinks = [
   { href: "/", label: "Standings" },
   { href: "/games", label: "Games" },
   { href: "/teams", label: "Teams" },
+  { href: "/players", label: "Players" },
 ];
 
 export default function RootLayout({
