@@ -16,6 +16,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "pipeline"))
 
 from euroleague_pipeline.models import (  # noqa: E402
+    Award,
     Club,
     Game,
     PersonStint,
@@ -84,6 +85,48 @@ from sqlalchemy.orm import Session  # noqa: E402
 @app.get("/health")
 def health() -> dict:
     return {"ok": True, "db": DB_PATH.exists()}
+
+
+@app.get("/api/awards")
+def awards(season: str = DEFAULT_SEASON) -> dict:
+    with Session(engine) as session:
+        clubs = load_clubs(session)
+        rows = session.execute(
+            select(Award)
+            .where(Award.season_code == season)
+            .order_by(Award.display_order)
+        ).scalars().all()
+        names = {
+            code: name
+            for code, name in session.execute(
+                select(
+                    PlayerGameStat.player_code, func.max(PlayerGameStat.player_name)
+                )
+                .where(
+                    PlayerGameStat.season_code == season,
+                    PlayerGameStat.player_code.in_([a.player_code for a in rows]),
+                )
+                .group_by(PlayerGameStat.player_code)
+            )
+        }
+        return {
+            "season": season,
+            "awards": [
+                {
+                    "award": a.award,
+                    "playerCode": a.player_code,
+                    "name": names.get(a.player_code),
+                    "clubCode": a.club_code,
+                    "clubName": clubs[a.club_code].name
+                    if a.club_code in clubs
+                    else None,
+                    "crestUrl": clubs[a.club_code].crest_url
+                    if a.club_code in clubs
+                    else None,
+                }
+                for a in rows
+            ],
+        }
 
 
 @app.get("/api/search")

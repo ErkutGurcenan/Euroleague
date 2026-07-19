@@ -20,7 +20,8 @@ export const metadata: Metadata = {
 };
 
 const navLinks = [
-  { href: "/", label: "Standings" },
+  { href: "/", label: "Home" },
+  { href: "/standings", label: "Standings" },
   { href: "/games", label: "Games" },
   { href: "/teams", label: "Teams" },
   { href: "/players", label: "Players" },

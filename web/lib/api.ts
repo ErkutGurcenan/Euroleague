@@ -290,6 +290,19 @@ export function getHighs() {
   }>(`/api/highs`);
 }
 
+export type AwardEntry = {
+  award: string;
+  playerCode: string;
+  name: string | null;
+  clubCode: string | null;
+  clubName: string | null;
+  crestUrl: string | null;
+};
+
+export function getAwards() {
+  return get<{ season: string; awards: AwardEntry[] }>(`/api/awards`);
+}
+
 export type SearchResults = {
   clubs: ClubSummary[];
   players: {
