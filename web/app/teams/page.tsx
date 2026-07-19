@@ -23,13 +23,23 @@ export default async function TeamsPage() {
                 className="h-10 w-10 object-contain"
               />
             )}
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <div className="truncate font-medium">{club.name}</div>
               <div className="text-xs text-neutral-500">
                 {club.city ? `${club.city}, ` : ""}
                 {club.country}
               </div>
             </div>
+            {club.record && (
+              <div className="text-right">
+                <div className="text-sm font-semibold tabular-nums">
+                  {club.record}
+                </div>
+                <div className="text-xs text-neutral-500">
+                  {club.position ? `#${club.position}` : ""}
+                </div>
+              </div>
+            )}
           </Link>
         ))}
       </div>

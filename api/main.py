@@ -352,8 +352,33 @@ def game_detail(game_code: int, season: str = DEFAULT_SEASON) -> dict:
 @app.get("/api/clubs")
 def clubs_index(season: str = DEFAULT_SEASON) -> dict:
     with Session(engine) as session:
+        last_round = session.execute(
+            select(func.max(StandingRow.round)).where(
+                StandingRow.season_code == season
+            )
+        ).scalar()
+        table = {
+            r.club_code: r
+            for r in session.execute(
+                select(StandingRow).where(
+                    StandingRow.season_code == season,
+                    StandingRow.round == last_round,
+                )
+            ).scalars()
+        }
         rows = session.execute(select(Club).order_by(Club.name)).scalars()
-        return {"clubs": [club_dict(c) for c in rows]}
+        clubs = []
+        for c in rows:
+            st = table.get(c.code)
+            clubs.append(
+                {
+                    **club_dict(c),
+                    "position": st.position if st else None,
+                    "record": f"{st.games_won}–{st.games_lost}" if st else None,
+                }
+            )
+        clubs.sort(key=lambda x: x["position"] or 99)
+        return {"clubs": clubs}
 
 
 def pct(made, attempted) -> Optional[float]:
@@ -438,6 +463,62 @@ def players_index(
             )
         players.sort(key=lambda p: -p["pir"])
         return {"season": season, "minGames": threshold, "players": players}
+
+
+HIGH_CATEGORIES = [
+    ("points", "Points", PlayerGameStat.points),
+    ("rebounds", "Rebounds", PlayerGameStat.treb),
+    ("assists", "Assists", PlayerGameStat.ast),
+    ("threes", "Three-pointers", PlayerGameStat.fg3m),
+    ("steals", "Steals", PlayerGameStat.stl),
+    ("blocks", "Blocks", PlayerGameStat.blk),
+    ("pir", "PIR", PlayerGameStat.pir),
+]
+
+
+@app.get("/api/highs")
+def season_highs(season: str = DEFAULT_SEASON, limit: int = 10) -> dict:
+    """Best single-game performances of the season per category."""
+    with Session(engine) as session:
+        clubs = load_clubs(session)
+        games_by_code = {
+            gm.game_code: gm
+            for gm in session.execute(
+                select(Game).where(Game.season_code == season, Game.played)
+            ).scalars()
+        }
+        categories = []
+        for key, label, col in HIGH_CATEGORIES:
+            rows = session.execute(
+                select(PlayerGameStat)
+                .where(PlayerGameStat.season_code == season, col.is_not(None))
+                .order_by(col.desc(), PlayerGameStat.pir.desc())
+                .limit(limit)
+            ).scalars().all()
+            entries = []
+            for s in rows:
+                gm = games_by_code.get(s.game_code)
+                home = gm and gm.local_club_code == s.club_code
+                opp_code = (
+                    (gm.road_club_code if home else gm.local_club_code) if gm else None
+                )
+                opp = clubs.get(opp_code) if opp_code else None
+                entries.append(
+                    {
+                        "playerCode": s.player_code,
+                        "name": s.player_name,
+                        "clubCode": s.club_code,
+                        "value": getattr(s, col.key),
+                        "gameCode": s.game_code,
+                        "round": gm.round if gm else None,
+                        "opponent": opp.abbreviated_name if opp else None,
+                        "utcDate": gm.utc_date.date().isoformat()
+                        if gm and gm.utc_date
+                        else None,
+                    }
+                )
+            categories.append({"key": key, "label": label, "entries": entries})
+        return {"season": season, "categories": categories}
 
 
 @app.get("/api/players/{player_code}")
