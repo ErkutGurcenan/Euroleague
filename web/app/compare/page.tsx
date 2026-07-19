@@ -1,6 +1,7 @@
 export const metadata = { title: "Compare players" };
 
 import Link from "next/link";
+import Headshot from "@/components/Headshot";
 import PlayerPicker from "@/components/PlayerPicker";
 import ShotChart from "@/components/ShotChart";
 import ZoneChart from "@/components/ZoneChart";
@@ -49,17 +50,20 @@ function StatRow({
 
 function PlayerHeader({ player }: { player: PlayerDetail }) {
   return (
-    <div className="mt-3">
-      <Link
-        href={`/players/${player.playerCode}`}
-        className="font-semibold hover:text-orange-400"
-      >
-        {player.name}
-      </Link>
-      <p className="text-xs text-neutral-400">
-        {player.club?.name}
-        {player.positionName && ` · ${player.positionName}`}
-      </p>
+    <div className="mt-3 flex items-center gap-3">
+      <Headshot src={player.imageUrl} name={player.name} size={48} />
+      <div className="min-w-0">
+        <Link
+          href={`/players/${player.playerCode}`}
+          className="font-semibold hover:text-orange-400"
+        >
+          {player.name}
+        </Link>
+        <p className="text-xs text-neutral-400">
+          {player.club?.name}
+          {player.positionName && ` · ${player.positionName}`}
+        </p>
+      </div>
     </div>
   );
 }

@@ -97,6 +97,7 @@ export function getClubs() {
 export type PlayerSummary = {
   playerCode: string;
   name: string;
+  imageUrl: string | null;
   club: ClubSummary | null;
   gamesPlayed: number;
   minutes: number;
@@ -338,6 +339,7 @@ export type SearchResults = {
   players: {
     playerCode: string;
     name: string;
+    imageUrl: string | null;
     clubCode: string | null;
     clubName: string | null;
   }[];
