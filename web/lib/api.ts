@@ -77,6 +77,17 @@ export function getStandings(round?: number) {
   );
 }
 
+export type StandingsHistoryClub = {
+  club: ClubSummary;
+  rounds: { round: number; position: number | null }[];
+};
+
+export function getStandingsHistory() {
+  return get<{ season: string; clubs: StandingsHistoryClub[] }>(
+    `/api/standings/history`,
+  );
+}
+
 export function getGames(params?: { round?: number; club?: string }) {
   const qs = new URLSearchParams();
   if (params?.round !== undefined) qs.set("round", String(params.round));
