@@ -772,6 +772,42 @@ def club_detail(code: str, season: str = DEFAULT_SEASON) -> dict:
             )
             .order_by(PersonStint.dorsal)
         ).scalars()
+        g = PlayerGameStat
+        player_stats = {
+            row[0]: row
+            for row in session.execute(
+                select(
+                    g.player_code,
+                    func.count(),
+                    func.sum(g.seconds_played),
+                    func.sum(g.points),
+                    func.sum(g.treb),
+                    func.sum(g.ast),
+                    func.sum(g.pir),
+                )
+                .where(
+                    g.season_code == season,
+                    g.club_code == code,  # only games for THIS club (transfers)
+                )
+                .group_by(g.player_code)
+            )
+        }
+
+        def roster_stats(person_code: str) -> dict:
+            row = player_stats.get(person_code)
+            if not row:
+                return {"gamesPlayed": 0, "minutes": None, "points": None,
+                        "rebounds": None, "assists": None, "pir": None}
+            _, gp, secs, pts, reb, ast, pir = row
+            per = lambda total: round((total or 0) / gp, 1)  # noqa: E731
+            return {
+                "gamesPlayed": gp,
+                "minutes": round((secs or 0) / 60.0 / gp, 1),
+                "points": per(pts),
+                "rebounds": per(reb),
+                "assists": per(ast),
+                "pir": per(pir),
+            }
         games_q = session.execute(
             select(Game)
             .where(
@@ -793,6 +829,7 @@ def club_detail(code: str, season: str = DEFAULT_SEASON) -> dict:
                     "birthDate": p.birth_date.date().isoformat() if p.birth_date else None,
                     "country": p.country_name,
                     "active": p.active,
+                    **roster_stats(p.person_code),
                 }
                 for p in roster
             ],

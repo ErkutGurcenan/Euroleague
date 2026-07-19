@@ -54,6 +54,12 @@ export type RosterEntry = {
   birthDate: string | null;
   country: string | null;
   active: boolean | null;
+  gamesPlayed: number;
+  minutes: number | null;
+  points: number | null;
+  rebounds: number | null;
+  assists: number | null;
+  pir: number | null;
 };
 
 async function get<T>(path: string): Promise<T> {

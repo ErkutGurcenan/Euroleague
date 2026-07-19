@@ -97,7 +97,12 @@ export default async function TeamPage({
               <th className="px-3 py-2">Position</th>
               <th className="px-3 py-2 text-right">Height</th>
               <th className="px-3 py-2 text-right">Age</th>
-              <th className="px-3 py-2">Country</th>
+              <th className="px-2 py-2 text-right">GP</th>
+              <th className="px-2 py-2 text-right">Min</th>
+              <th className="px-2 py-2 text-right">Pts</th>
+              <th className="px-2 py-2 text-right">Reb</th>
+              <th className="px-2 py-2 text-right">Ast</th>
+              <th className="px-2 py-2 text-right">PIR</th>
             </tr>
           </thead>
           <tbody>
@@ -126,7 +131,24 @@ export default async function TeamPage({
                 <td className="px-3 py-2 text-right text-neutral-400">
                   {age(p.birthDate)}
                 </td>
-                <td className="px-3 py-2 text-neutral-400">{p.country}</td>
+                <td className="px-2 py-2 text-right tabular-nums text-neutral-400">
+                  {p.gamesPlayed || "–"}
+                </td>
+                <td className="px-2 py-2 text-right tabular-nums text-neutral-400">
+                  {p.minutes ?? "–"}
+                </td>
+                <td className="px-2 py-2 text-right font-medium tabular-nums">
+                  {p.points ?? "–"}
+                </td>
+                <td className="px-2 py-2 text-right tabular-nums">
+                  {p.rebounds ?? "–"}
+                </td>
+                <td className="px-2 py-2 text-right tabular-nums">
+                  {p.assists ?? "–"}
+                </td>
+                <td className="px-2 py-2 text-right tabular-nums">
+                  {p.pir ?? "–"}
+                </td>
               </tr>
             ))}
           </tbody>
