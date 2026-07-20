@@ -2,9 +2,10 @@ export const metadata = { title: "Season highs" };
 
 import Link from "next/link";
 import { getHighs } from "@/lib/api";
+import { currentSeason } from "@/lib/season";
 
 export default async function HighsPage() {
-  const { categories } = await getHighs();
+  const { categories } = await getHighs(await currentSeason());
 
   return (
     <div>

@@ -6,6 +6,7 @@ import ShotChart from "@/components/ShotChart";
 import TeamPicker from "@/components/TeamPicker";
 import ZoneChart from "@/components/ZoneChart";
 import { getClub, getClubShots } from "@/lib/api";
+import { currentSeason } from "@/lib/season";
 
 type ClubBundle = Awaited<ReturnType<typeof getClub>>;
 
@@ -79,12 +80,13 @@ export default async function CompareTeamsPage({
   searchParams: Promise<{ a?: string; b?: string }>;
 }) {
   const { a, b } = await searchParams;
+  const season = await currentSeason();
   const safe = <T,>(p: Promise<T>) => p.catch(() => null);
   const [ta, tb, sa, sb] = await Promise.all([
-    a ? safe(getClub(a.toUpperCase())) : null,
-    b ? safe(getClub(b.toUpperCase())) : null,
-    a ? safe(getClubShots(a.toUpperCase())) : null,
-    b ? safe(getClubShots(b.toUpperCase())) : null,
+    a ? safe(getClub(a.toUpperCase(), season)) : null,
+    b ? safe(getClub(b.toUpperCase(), season)) : null,
+    a ? safe(getClubShots(a.toUpperCase(), season)) : null,
+    b ? safe(getClubShots(b.toUpperCase(), season)) : null,
   ]);
 
   const meetings =

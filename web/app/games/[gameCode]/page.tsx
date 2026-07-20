@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import GameCard from "@/components/GameCard";
 import ShotChart from "@/components/ShotChart";
 import { getGame, type GameDetail, type GameDetailSide } from "@/lib/api";
+import { currentSeason } from "@/lib/season";
 
 function seriesTally(game: GameDetail): string | null {
   const codeA = game.home.club?.code;
@@ -159,7 +160,7 @@ export async function generateMetadata({
 }) {
   const { gameCode } = await params;
   try {
-    const g = await getGame(Number(gameCode));
+    const g = await getGame(Number(gameCode), await currentSeason());
     const h = g.home.club?.abbreviatedName ?? g.home.club?.code;
     const a = g.away.club?.abbreviatedName ?? g.away.club?.code;
     return {
@@ -178,7 +179,7 @@ export default async function GamePage({
   const { gameCode } = await params;
   let game;
   try {
-    game = await getGame(Number(gameCode));
+    game = await getGame(Number(gameCode), await currentSeason());
   } catch {
     notFound();
   }

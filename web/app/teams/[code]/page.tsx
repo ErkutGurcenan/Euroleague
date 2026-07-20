@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import GameCard from "@/components/GameCard";
 import ShotChartExplorer from "@/components/ShotChartExplorer";
 import { getClub, getClubShots } from "@/lib/api";
+import { currentSeason } from "@/lib/season";
 
 function age(birthDate: string | null): string {
   if (!birthDate) return "–";
@@ -21,7 +22,7 @@ export async function generateMetadata({
 }) {
   const { code } = await params;
   try {
-    const { club } = await getClub(code.toUpperCase());
+    const { club } = await getClub(code.toUpperCase(), await currentSeason());
     return { title: club.name };
   } catch {
     return {};
@@ -34,11 +35,12 @@ export default async function TeamPage({
   params: Promise<{ code: string }>;
 }) {
   const { code } = await params;
+  const season = await currentSeason();
   let data, shotData;
   try {
     [data, shotData] = await Promise.all([
-      getClub(code.toUpperCase()),
-      getClubShots(code.toUpperCase()),
+      getClub(code.toUpperCase(), season),
+      getClubShots(code.toUpperCase(), season),
     ]);
   } catch {
     notFound();

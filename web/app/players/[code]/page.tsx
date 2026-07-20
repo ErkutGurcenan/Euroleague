@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import GameLogChart from "@/components/GameLogChart";
 import ShotChartExplorer from "@/components/ShotChartExplorer";
 import { getPlayer, getPlayerShots } from "@/lib/api";
+import { currentSeason } from "@/lib/season";
 
 function StatCard({ label, value }: { label: string; value: string | number }) {
   return (
@@ -19,7 +21,7 @@ export async function generateMetadata({
 }) {
   const { code } = await params;
   try {
-    const player = await getPlayer(code);
+    const player = await getPlayer(code, await currentSeason());
     return { title: player.name };
   } catch {
     return {};
@@ -32,9 +34,13 @@ export default async function PlayerPage({
   params: Promise<{ code: string }>;
 }) {
   const { code } = await params;
+  const season = await currentSeason();
   let player, shotData;
   try {
-    [player, shotData] = await Promise.all([getPlayer(code), getPlayerShots(code)]);
+    [player, shotData] = await Promise.all([
+      getPlayer(code, season),
+      getPlayerShots(code, season),
+    ]);
   } catch {
     notFound();
   }
@@ -82,6 +88,33 @@ export default async function PlayerPage({
         <StatCard label="Ast" value={a.assists} />
         <StatCard label="PIR" value={a.pir} />
       </div>
+
+      {player.gameLog.length >= 2 && (
+        <div className="mb-8 grid max-w-4xl grid-cols-1 gap-3 lg:grid-cols-2">
+          <GameLogChart
+            title="Points by game"
+            unit="pts"
+            entries={player.gameLog.map((g) => ({
+              value: g.points ?? 0,
+              won: g.won,
+              label: `R${g.round} ${g.home ? "vs" : "@"} ${
+                g.opponent?.abbreviatedName ?? "?"
+              }`,
+            }))}
+          />
+          <GameLogChart
+            title="PIR by game"
+            unit="PIR"
+            entries={player.gameLog.map((g) => ({
+              value: g.pir ?? 0,
+              won: g.won,
+              label: `R${g.round} ${g.home ? "vs" : "@"} ${
+                g.opponent?.abbreviatedName ?? "?"
+              }`,
+            }))}
+          />
+        </div>
+      )}
 
       <h2 className="mb-3 text-lg font-semibold">Shooting</h2>
       <div className="mb-4 grid max-w-md grid-cols-3 gap-3">

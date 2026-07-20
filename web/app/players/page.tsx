@@ -2,7 +2,11 @@ export const metadata = { title: "Players" };
 
 import Link from "next/link";
 import Headshot from "@/components/Headshot";
+import TeamFilterSelect from "@/components/TeamFilterSelect";
 import { getPlayers, getTransfers, type PlayerSummary } from "@/lib/api";
+import { currentSeason } from "@/lib/season";
+
+const POSITIONS = ["Guard", "Forward", "Center"];
 
 const SORTS: Record<string, { label: string; key: keyof PlayerSummary }> = {
   pir: { label: "PIR", key: "pir" },
@@ -17,17 +21,38 @@ const SORTS: Record<string, { label: string; key: keyof PlayerSummary }> = {
 export default async function PlayersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ sort?: string }>;
+  searchParams: Promise<{ sort?: string; team?: string; pos?: string }>;
 }) {
   const params = await searchParams;
   const sortKey = SORTS[params.sort ?? "pir"] ? params.sort ?? "pir" : "pir";
+  const team = params.team ?? null;
+  const pos = params.pos && POSITIONS.includes(params.pos) ? params.pos : null;
+  const season = await currentSeason();
   const [{ players, minGames }, { transfers }] = await Promise.all([
-    getPlayers(),
-    getTransfers(),
+    getPlayers(season),
+    getTransfers(season),
   ]);
-  const sorted = [...players].sort(
+  const teams = [
+    ...new Map(
+      players
+        .filter((p) => p.club)
+        .map((p) => [p.club!.code, { code: p.club!.code, name: p.club!.name }]),
+    ).values(),
+  ].sort((a, b) => a.name.localeCompare(b.name));
+  const filtered = players.filter(
+    (p) =>
+      (!team || p.club?.code === team) && (!pos || p.position === pos),
+  );
+  const sorted = [...filtered].sort(
     (a, b) => (b[SORTS[sortKey].key] as number) - (a[SORTS[sortKey].key] as number),
   );
+  const filterQs = (overrides: Record<string, string | null>) => {
+    const q = new URLSearchParams();
+    const merged = { sort: params.sort ?? null, team, pos, ...overrides };
+    for (const [k, v] of Object.entries(merged)) if (v) q.set(k, v);
+    const s = q.toString();
+    return s ? `/players?${s}` : "/players";
+  };
 
   return (
     <div>
@@ -35,6 +60,37 @@ export default async function PlayersPage({
         <h1 className="text-2xl font-bold">Players</h1>
         <span className="text-sm text-neutral-400">
           Per-game averages · min. {minGames} game{minGames === 1 ? "" : "s"}
+        </span>
+      </div>
+
+      <div className="mb-4 flex flex-wrap items-center gap-1.5">
+        <Link
+          href={filterQs({ pos: null })}
+          className={`rounded px-2.5 py-1 text-xs ${
+            !pos
+              ? "bg-orange-600 text-white"
+              : "bg-neutral-900 text-neutral-400 hover:bg-neutral-800"
+          }`}
+        >
+          All positions
+        </Link>
+        {POSITIONS.map((p) => (
+          <Link
+            key={p}
+            href={filterQs({ pos: p })}
+            className={`rounded px-2.5 py-1 text-xs ${
+              pos === p
+                ? "bg-orange-600 text-white"
+                : "bg-neutral-900 text-neutral-400 hover:bg-neutral-800"
+            }`}
+          >
+            {p}s
+          </Link>
+        ))}
+        <span className="mx-1 h-4 w-px bg-neutral-700" />
+        <TeamFilterSelect teams={teams} current={team} />
+        <span className="ml-auto text-xs text-neutral-500">
+          {sorted.length} players
         </span>
       </div>
       <div className="overflow-x-auto rounded-lg border border-neutral-800">
@@ -48,7 +104,7 @@ export default async function PlayersPage({
               {Object.entries(SORTS).map(([k, s]) => (
                 <th key={k} className="px-2 py-2 text-right">
                   <Link
-                    href={`/players?sort=${k}`}
+                    href={filterQs({ sort: k })}
                     className={k === sortKey ? "text-orange-400" : "hover:text-white"}
                   >
                     {s.label}

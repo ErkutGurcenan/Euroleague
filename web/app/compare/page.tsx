@@ -11,6 +11,7 @@ import {
   type PlayerDetail,
   type ShotPoint,
 } from "@/lib/api";
+import { currentSeason } from "@/lib/season";
 
 function StatRow({
   label,
@@ -83,12 +84,13 @@ export default async function ComparePage({
   searchParams: Promise<{ a?: string; b?: string }>;
 }) {
   const { a, b } = await searchParams;
+  const season = await currentSeason();
   const safe = <T,>(p: Promise<T>) => p.catch(() => null);
   const [pa, pb, sa, sb] = await Promise.all([
-    a ? safe(getPlayer(a)) : null,
-    b ? safe(getPlayer(b)) : null,
-    a ? safe(getPlayerShots(a)) : null,
-    b ? safe(getPlayerShots(b)) : null,
+    a ? safe(getPlayer(a, season)) : null,
+    b ? safe(getPlayer(b, season)) : null,
+    a ? safe(getPlayerShots(a, season)) : null,
+    b ? safe(getPlayerShots(b, season)) : null,
   ]);
 
   return (
