@@ -254,8 +254,16 @@ export function getClubShots(code: string) {
   );
 }
 
+export type QuarterProfile = {
+  quarter: number;
+  for: number | null;
+  against: number | null;
+  net: number | null;
+};
+
 export type TeamSeasonStats = {
   gamesPlayed: number;
+  quarters: QuarterProfile[];
   wins: number;
   losses: number;
   points: number;
@@ -318,6 +326,19 @@ export function getNotableGames() {
     season: string;
     categories: { key: string; label: string; entries: NotableEntry[] }[];
   }>(`/api/games/notable`);
+}
+
+export type TransferEntry = {
+  playerCode: string;
+  name: string | null;
+  imageUrl: string | null;
+  from: { code: string; name: string; crestUrl: string | null } | null;
+  to: { code: string; name: string; crestUrl: string | null } | null;
+  date: string | null;
+};
+
+export function getTransfers() {
+  return get<{ season: string; transfers: TransferEntry[] }>(`/api/transfers`);
 }
 
 export type AwardEntry = {

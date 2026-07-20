@@ -721,6 +721,49 @@ def season_highs(season: str = DEFAULT_SEASON, limit: int = 10) -> dict:
         return {"season": season, "categories": categories}
 
 
+@app.get("/api/transfers")
+def transfers(season: str = DEFAULT_SEASON) -> dict:
+    """Mid-season moves: players with consecutive stints at different clubs."""
+    with Session(engine) as session:
+        clubs = load_clubs(session)
+        stints = session.execute(
+            select(PersonStint)
+            .where(PersonStint.season_code == season, PersonStint.type == "J")
+            .order_by(PersonStint.person_code, PersonStint.start_date)
+        ).scalars().all()
+        by_player: dict[str, list[PersonStint]] = {}
+        for s in stints:
+            by_player.setdefault(s.person_code, []).append(s)
+
+        def mini_club(code: Optional[str]) -> Optional[dict]:
+            c = clubs.get(code) if code else None
+            return (
+                {"code": c.code, "name": c.name, "crestUrl": c.crest_url}
+                if c
+                else None
+            )
+
+        moves = []
+        for code, ss in by_player.items():
+            for prev, nxt in zip(ss, ss[1:]):
+                if prev.club_code == nxt.club_code:
+                    continue
+                moves.append(
+                    {
+                        "playerCode": code,
+                        "name": nxt.name or prev.name,
+                        "imageUrl": nxt.image_url or prev.image_url,
+                        "from": mini_club(prev.club_code),
+                        "to": mini_club(nxt.club_code),
+                        "date": nxt.start_date.date().isoformat()
+                        if nxt.start_date
+                        else None,
+                    }
+                )
+        moves.sort(key=lambda m: m["date"] or "", reverse=True)
+        return {"season": season, "transfers": moves}
+
+
 @app.get("/api/players/{player_code}")
 def player_detail(player_code: str, season: str = DEFAULT_SEASON) -> dict:
     g = PlayerGameStat
@@ -908,9 +951,31 @@ def club_season_stats(session, code: str, season: str) -> Optional[dict]:
             if own > opp:
                 wins += 1
 
+    quarters = []
+    for i in (1, 2, 3, 4):
+        own_total = opp_total = qn = 0
+        for gm in games:
+            home = gm.local_club_code == code
+            own_q = getattr(gm, f"{'local' if home else 'road'}_q{i}")
+            opp_q = getattr(gm, f"{'road' if home else 'local'}_q{i}")
+            if own_q is None or opp_q is None:
+                continue
+            own_total += own_q
+            opp_total += opp_q
+            qn += 1
+        quarters.append(
+            {
+                "quarter": i,
+                "for": round(own_total / qn, 1) if qn else None,
+                "against": round(opp_total / qn, 1) if qn else None,
+                "net": round((own_total - opp_total) / qn, 1) if qn else None,
+            }
+        )
+
     per = lambda total: round((total or 0) / n, 1)  # noqa: E731
     return {
         "gamesPlayed": n,
+        "quarters": quarters,
         "wins": wins,
         "losses": len(games) - wins,
         "points": per(pts),

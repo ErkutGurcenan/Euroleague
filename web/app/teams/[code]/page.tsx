@@ -131,6 +131,38 @@ export default async function TeamPage({
         </>
       )}
 
+      {stats && (
+        <>
+          <h2 className="mb-3 text-lg font-semibold">Quarter profile</h2>
+          <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {stats.quarters.map((q) => (
+              <div
+                key={q.quarter}
+                className="rounded-lg border border-neutral-800 bg-neutral-900/40 px-3 py-3 text-center"
+              >
+                <div className="text-xs uppercase text-neutral-500">
+                  Q{q.quarter}
+                </div>
+                <div
+                  className={`text-lg font-bold tabular-nums ${
+                    (q.net ?? 0) > 0
+                      ? "text-emerald-400"
+                      : (q.net ?? 0) < 0
+                        ? "text-red-400"
+                        : ""
+                  }`}
+                >
+                  {q.net !== null && q.net > 0 ? `+${q.net}` : (q.net ?? "–")}
+                </div>
+                <div className="text-xs tabular-nums text-neutral-400">
+                  {q.for} – {q.against}
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
       <h2 className="mb-3 text-lg font-semibold">Roster</h2>
       <div className="mb-8 overflow-x-auto rounded-lg border border-neutral-800">
         <table className="w-full text-sm">
