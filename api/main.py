@@ -736,6 +736,54 @@ def season_highs(season: str = DEFAULT_SEASON, limit: int = 10) -> dict:
         return {"season": season, "categories": categories}
 
 
+@app.get("/api/rounds/{round_no}/mvp")
+def round_mvp(round_no: int, season: str = DEFAULT_SEASON) -> dict:
+    """Best single-game PIR performance of a round."""
+    with Session(engine) as session:
+        row = session.execute(
+            select(PlayerGameStat, Game)
+            .join(
+                Game,
+                (Game.season_code == PlayerGameStat.season_code)
+                & (Game.game_code == PlayerGameStat.game_code),
+            )
+            .where(
+                PlayerGameStat.season_code == season,
+                Game.round == round_no,
+                Game.played,
+            )
+            .order_by(PlayerGameStat.pir.desc())
+            .limit(1)
+        ).first()
+        if row is None:
+            raise HTTPException(404, f"no played games in round {round_no}")
+        s, gm = row
+        clubs = load_clubs(session)
+        home = gm.local_club_code == s.club_code
+        opp = clubs.get(gm.road_club_code if home else gm.local_club_code)
+        image = session.execute(
+            select(func.max(PersonStint.image_url)).where(
+                PersonStint.season_code == season,
+                PersonStint.person_code == s.player_code,
+                PersonStint.type == "J",
+            )
+        ).scalar()
+        club = clubs.get(s.club_code)
+        return {
+            "playerCode": s.player_code,
+            "name": s.player_name,
+            "imageUrl": image,
+            "clubCode": s.club_code,
+            "clubName": club.name if club else None,
+            "gameCode": s.game_code,
+            "opponent": opp.abbreviated_name if opp else None,
+            "points": s.points,
+            "rebounds": s.treb,
+            "assists": s.ast,
+            "pir": s.pir,
+        }
+
+
 @app.get("/api/transfers")
 def transfers(season: str = DEFAULT_SEASON) -> dict:
     """Mid-season moves: players with consecutive stints at different clubs."""
@@ -813,11 +861,15 @@ def player_detail(player_code: str, season: str = DEFAULT_SEASON) -> dict:
             gm = games_by_code.get(s.game_code)
             opp_code = None
             home = None
+            won = None
             if gm:
                 home = gm.local_club_code == s.club_code
                 opp_code = gm.road_club_code if home else gm.local_club_code
+                if gm.local_score is not None and gm.road_score is not None:
+                    won = (gm.local_score > gm.road_score) == home
             opp = clubs.get(opp_code) if opp_code else None
             return {
+                "won": won,
                 "gameCode": s.game_code,
                 "round": gm.round if gm else None,
                 "utcDate": gm.utc_date.isoformat() + "Z" if gm and gm.utc_date else None,

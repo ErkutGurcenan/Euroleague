@@ -2,7 +2,8 @@ export const metadata = { title: "Games" };
 
 import Link from "next/link";
 import GameCard from "@/components/GameCard";
-import { getGames, type Game } from "@/lib/api";
+import Headshot from "@/components/Headshot";
+import { getGames, getRoundMvp, type Game } from "@/lib/api";
 
 const PHASES: Record<string, string> = {
   PI: "Play-In",
@@ -173,12 +174,40 @@ export default async function GamesPage({
     ));
   } else {
     const games = allGames.filter((g) => g.round === round);
+    const mvp = round
+      ? await getRoundMvp(round).catch(() => null)
+      : null;
     content = (
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {games.map((g) => (
-          <GameCard key={g.id} game={g} />
-        ))}
-      </div>
+      <>
+        {mvp && (
+          <Link
+            href={`/games/${mvp.gameCode}`}
+            className="mb-4 flex items-center gap-3 rounded-lg border border-neutral-800 bg-neutral-900/40 p-3 transition-colors hover:border-orange-600/50"
+          >
+            <Headshot src={mvp.imageUrl} name={mvp.name} size={44} />
+            <div className="min-w-0">
+              <div className="text-xs uppercase tracking-wide text-orange-400">
+                Player of the round
+              </div>
+              <div className="truncate font-semibold">
+                {mvp.name}
+                <span className="ml-1.5 text-xs font-normal text-neutral-500">
+                  {mvp.clubName}
+                </span>
+              </div>
+              <div className="text-xs tabular-nums text-neutral-400">
+                {mvp.points} pts · {mvp.rebounds} reb · {mvp.assists} ast ·
+                PIR {mvp.pir} vs {mvp.opponent}
+              </div>
+            </div>
+          </Link>
+        )}
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {games.map((g) => (
+            <GameCard key={g.id} game={g} />
+          ))}
+        </div>
+      </>
     );
   }
 

@@ -125,6 +125,7 @@ export type PlayerSummary = {
 };
 
 export type GameLogEntry = {
+  won: boolean | null;
   gameCode: number;
   round: number | null;
   utcDate: string | null;
@@ -338,6 +339,24 @@ export function getNotableGames() {
     season: string;
     categories: { key: string; label: string; entries: NotableEntry[] }[];
   }>(`/api/games/notable`);
+}
+
+export type RoundMvp = {
+  playerCode: string;
+  name: string | null;
+  imageUrl: string | null;
+  clubCode: string | null;
+  clubName: string | null;
+  gameCode: number;
+  opponent: string | null;
+  points: number;
+  rebounds: number;
+  assists: number;
+  pir: number;
+};
+
+export function getRoundMvp(round: number) {
+  return get<RoundMvp>(`/api/rounds/${round}/mvp`);
 }
 
 export type TransferEntry = {
