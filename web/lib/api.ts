@@ -70,10 +70,24 @@ async function get<T>(path: string): Promise<T> {
   return res.json();
 }
 
-export function getStandings(round?: number) {
-  const qs = round ? `?round=${round}` : "";
+function qs(params: Record<string, string | number | undefined | null>) {
+  const q = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v !== undefined && v !== null && v !== "") q.set(k, String(v));
+  }
+  const s = q.toString();
+  return s ? `?${s}` : "";
+}
+
+export type SeasonInfo = { code: string; label: string; note: string | null };
+
+export function getSeasons() {
+  return get<{ seasons: SeasonInfo[]; default: string }>(`/api/seasons`);
+}
+
+export function getStandings(round?: number, season?: string) {
   return get<{ season: string; round: number; standings: StandingRow[] }>(
-    `/api/standings${qs}`,
+    `/api/standings${qs({ round, season })}`,
   );
 }
 
@@ -82,18 +96,14 @@ export type StandingsHistoryClub = {
   rounds: { round: number; position: number | null }[];
 };
 
-export function getStandingsHistory() {
+export function getStandingsHistory(season?: string) {
   return get<{ season: string; clubs: StandingsHistoryClub[] }>(
-    `/api/standings/history`,
+    `/api/standings/history${qs({ season })}`,
   );
 }
 
-export function getGames(params?: { round?: number; club?: string }) {
-  const qs = new URLSearchParams();
-  if (params?.round !== undefined) qs.set("round", String(params.round));
-  if (params?.club) qs.set("club", params.club);
-  const suffix = qs.size ? `?${qs}` : "";
-  return get<{ season: string; games: Game[] }>(`/api/games${suffix}`);
+export function getGames(season?: string) {
+  return get<{ season: string; games: Game[] }>(`/api/games${qs({ season })}`);
 }
 
 export type ClubWithRecord = ClubSummary & {
@@ -101,8 +111,8 @@ export type ClubWithRecord = ClubSummary & {
   record: string | null;
 };
 
-export function getClubs() {
-  return get<{ clubs: ClubWithRecord[] }>(`/api/clubs`);
+export function getClubs(season?: string) {
+  return get<{ clubs: ClubWithRecord[] }>(`/api/clubs${qs({ season })}`);
 }
 
 export type PlayerSummary = {
@@ -242,29 +252,29 @@ export type GameDetail = {
   away: GameDetailSide;
 };
 
-export function getGame(gameCode: number) {
-  return get<GameDetail>(`/api/games/${gameCode}`);
+export function getGame(gameCode: number, season?: string) {
+  return get<GameDetail>(`/api/games/${gameCode}${qs({ season })}`);
 }
 
-export function getPlayers() {
+export function getPlayers(season?: string) {
   return get<{ season: string; minGames: number; players: PlayerSummary[] }>(
-    `/api/players`,
+    `/api/players${qs({ season })}`,
   );
 }
 
-export function getPlayer(code: string) {
-  return get<PlayerDetail>(`/api/players/${code}`);
+export function getPlayer(code: string, season?: string) {
+  return get<PlayerDetail>(`/api/players/${code}${qs({ season })}`);
 }
 
-export function getPlayerShots(code: string) {
+export function getPlayerShots(code: string, season?: string) {
   return get<{ season: string; total: number; shots: ShotPoint[] }>(
-    `/api/players/${code}/shots`,
+    `/api/players/${code}/shots${qs({ season })}`,
   );
 }
 
-export function getClubShots(code: string) {
+export function getClubShots(code: string, season?: string) {
   return get<{ season: string; total: number; shots: ShotPoint[] }>(
-    `/api/clubs/${code}/shots`,
+    `/api/clubs/${code}/shots${qs({ season })}`,
   );
 }
 
@@ -301,14 +311,14 @@ export type CoachEntry = {
   active: boolean | null;
 };
 
-export function getClub(code: string) {
+export function getClub(code: string, season?: string) {
   return get<{
     club: ClubSummary;
     stats: TeamSeasonStats | null;
     coaches: CoachEntry[];
     roster: RosterEntry[];
     games: Game[];
-  }>(`/api/clubs/${code}`);
+  }>(`/api/clubs/${code}${qs({ season })}`);
 }
 
 export type HighEntry = {
@@ -322,11 +332,11 @@ export type HighEntry = {
   utcDate: string | null;
 };
 
-export function getHighs() {
+export function getHighs(season?: string) {
   return get<{
     season: string;
     categories: { key: string; label: string; entries: HighEntry[] }[];
-  }>(`/api/highs`);
+  }>(`/api/highs${qs({ season })}`);
 }
 
 export type NotableEntry = {
@@ -335,11 +345,11 @@ export type NotableEntry = {
   note: string | null;
 };
 
-export function getNotableGames() {
+export function getNotableGames(season?: string) {
   return get<{
     season: string;
     categories: { key: string; label: string; entries: NotableEntry[] }[];
-  }>(`/api/games/notable`);
+  }>(`/api/games/notable${qs({ season })}`);
 }
 
 export type RoundMvp = {
@@ -356,8 +366,8 @@ export type RoundMvp = {
   pir: number;
 };
 
-export function getRoundMvp(round: number) {
-  return get<RoundMvp>(`/api/rounds/${round}/mvp`);
+export function getRoundMvp(round: number, season?: string) {
+  return get<RoundMvp>(`/api/rounds/${round}/mvp${qs({ season })}`);
 }
 
 export type TransferEntry = {
@@ -369,8 +379,10 @@ export type TransferEntry = {
   date: string | null;
 };
 
-export function getTransfers() {
-  return get<{ season: string; transfers: TransferEntry[] }>(`/api/transfers`);
+export function getTransfers(season?: string) {
+  return get<{ season: string; transfers: TransferEntry[] }>(
+    `/api/transfers${qs({ season })}`,
+  );
 }
 
 export type AwardEntry = {
@@ -382,8 +394,10 @@ export type AwardEntry = {
   crestUrl: string | null;
 };
 
-export function getAwards() {
-  return get<{ season: string; awards: AwardEntry[] }>(`/api/awards`);
+export function getAwards(season?: string) {
+  return get<{ season: string; awards: AwardEntry[] }>(
+    `/api/awards${qs({ season })}`,
+  );
 }
 
 export type SearchResults = {

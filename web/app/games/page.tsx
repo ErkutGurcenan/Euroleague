@@ -4,6 +4,7 @@ import Link from "next/link";
 import GameCard from "@/components/GameCard";
 import Headshot from "@/components/Headshot";
 import { getGames, getRoundMvp, type Game } from "@/lib/api";
+import { currentSeason } from "@/lib/season";
 
 const PHASES: Record<string, string> = {
   PI: "Play-In",
@@ -56,6 +57,9 @@ function FinalFourBracket({ games }: { games: Game[] }) {
   const final = games.find((g) =>
     g.groupName?.toUpperCase().includes("CHAMPIONSHIP"),
   );
+  const thirdPlace = games.find((g) =>
+    g.groupName?.toUpperCase().includes("THIRD PLACE"),
+  );
   const label = (text: string) => (
     <h2 className="mb-2 text-center text-sm font-semibold uppercase tracking-wide text-neutral-400">
       {text}
@@ -77,6 +81,12 @@ function FinalFourBracket({ games }: { games: Game[] }) {
         {label("Semifinal")}
         {semiB && <GameCard game={semiB} />}
       </div>
+      {thirdPlace && (
+        <div className="lg:col-span-5 lg:mx-auto lg:w-80">
+          {label("Third place game")}
+          <GameCard game={thirdPlace} />
+        </div>
+      )}
     </div>
   );
 }
@@ -99,7 +109,8 @@ export default async function GamesPage({
   searchParams: Promise<{ round?: string; phase?: string; month?: string }>;
 }) {
   const params = await searchParams;
-  const { games: allGames } = await getGames();
+  const season = await currentSeason();
+  const { games: allGames } = await getGames(season);
 
   const rsRounds = [
     ...new Set(
@@ -175,7 +186,7 @@ export default async function GamesPage({
   } else {
     const games = allGames.filter((g) => g.round === round);
     const mvp = round
-      ? await getRoundMvp(round).catch(() => null)
+      ? await getRoundMvp(round, season).catch(() => null)
       : null;
     content = (
       <>

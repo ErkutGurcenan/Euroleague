@@ -2,6 +2,7 @@ export const metadata = { title: "Notable games" };
 
 import Link from "next/link";
 import { getNotableGames, type NotableEntry } from "@/lib/api";
+import { currentSeason } from "@/lib/season";
 
 function GameRow({ entry }: { entry: NotableEntry }) {
   const g = entry.game;
@@ -35,7 +36,7 @@ function GameRow({ entry }: { entry: NotableEntry }) {
 }
 
 export default async function NotablePage() {
-  const { categories } = await getNotableGames();
+  const { categories } = await getNotableGames(await currentSeason());
 
   return (
     <div>

@@ -40,6 +40,18 @@ app.add_middleware(
 DEFAULT_SEASON = "E2025"
 
 
+def season_label(code: str) -> str:
+    """E2024 -> '2024-25'."""
+    try:
+        year = int(code[1:])
+        return f"{year}-{str(year + 1)[-2:]}"
+    except (ValueError, IndexError):
+        return code
+
+
+CANCELED_SEASONS = {"E2019": "Season canceled after 28 rounds (COVID-19)"}
+
+
 def club_dict(c: Club) -> dict:
     return {
         "code": c.code,
@@ -86,6 +98,27 @@ from sqlalchemy.orm import Session  # noqa: E402
 @app.get("/health")
 def health() -> dict:
     return {"ok": True, "db": DB_PATH.exists()}
+
+
+@app.get("/api/seasons")
+def seasons() -> dict:
+    """Seasons present in the database, newest first."""
+    with Session(engine) as session:
+        codes = sorted(
+            session.execute(select(Game.season_code).distinct()).scalars(),
+            reverse=True,
+        )
+        return {
+            "seasons": [
+                {
+                    "code": c,
+                    "label": season_label(c),
+                    "note": CANCELED_SEASONS.get(c),
+                }
+                for c in codes
+            ],
+            "default": DEFAULT_SEASON,
+        }
 
 
 @app.get("/api/awards")
@@ -942,8 +975,10 @@ def player_detail(player_code: str, season: str = DEFAULT_SEASON) -> dict:
 
 def shots_payload(session, season: str, *, player: Optional[str] = None,
                   club: Optional[str] = None) -> dict:
+    # prefix match: older seasons use variants like 2FGAB (blocked = missed)
     q = select(Shot).where(
-        Shot.season_code == season, Shot.action_id.in_(["2FGM", "2FGA", "3FGM", "3FGA"])
+        Shot.season_code == season,
+        Shot.action_id.like("2FG%") | Shot.action_id.like("3FG%"),
     )
     if player:
         q = q.where(Shot.player_code == player)

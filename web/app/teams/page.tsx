@@ -2,9 +2,10 @@ export const metadata = { title: "Teams" };
 
 import Link from "next/link";
 import { getClubs } from "@/lib/api";
+import { currentSeason } from "@/lib/season";
 
 export default async function TeamsPage() {
-  const { clubs } = await getClubs();
+  const { clubs } = await getClubs(await currentSeason());
   const realClubs = clubs.filter((c) => c.country); // skip Final Four placeholders
 
   return (

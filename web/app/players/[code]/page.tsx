@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import GameLogChart from "@/components/GameLogChart";
 import ShotChartExplorer from "@/components/ShotChartExplorer";
 import { getPlayer, getPlayerShots } from "@/lib/api";
+import { currentSeason } from "@/lib/season";
 
 function StatCard({ label, value }: { label: string; value: string | number }) {
   return (
@@ -20,7 +21,7 @@ export async function generateMetadata({
 }) {
   const { code } = await params;
   try {
-    const player = await getPlayer(code);
+    const player = await getPlayer(code, await currentSeason());
     return { title: player.name };
   } catch {
     return {};
@@ -33,9 +34,13 @@ export default async function PlayerPage({
   params: Promise<{ code: string }>;
 }) {
   const { code } = await params;
+  const season = await currentSeason();
   let player, shotData;
   try {
-    [player, shotData] = await Promise.all([getPlayer(code), getPlayerShots(code)]);
+    [player, shotData] = await Promise.all([
+      getPlayer(code, season),
+      getPlayerShots(code, season),
+    ]);
   } catch {
     notFound();
   }

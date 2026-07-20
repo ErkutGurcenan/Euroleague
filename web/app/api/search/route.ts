@@ -9,8 +9,13 @@ export async function GET(req: NextRequest) {
   if (q.trim().length < 2) {
     return Response.json({ clubs: [], players: [] });
   }
+  const season = req.cookies.get("season")?.value;
+  const seasonParam =
+    season && /^E20\d{2}$/.test(season)
+      ? `&season=${encodeURIComponent(season)}`
+      : "";
   const res = await fetch(
-    `${API_URL}/api/search?q=${encodeURIComponent(q.trim())}`,
+    `${API_URL}/api/search?q=${encodeURIComponent(q.trim())}${seasonParam}`,
   );
   if (!res.ok) {
     return Response.json({ clubs: [], players: [] }, { status: 502 });

@@ -4,6 +4,9 @@ import Link from "next/link";
 import Logo from "@/components/Logo";
 import MobileNav from "@/components/MobileNav";
 import SearchBox from "@/components/SearchBox";
+import SeasonSelect from "@/components/SeasonSelect";
+import { getSeasons } from "@/lib/api";
+import { currentSeason } from "@/lib/season";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -36,11 +39,17 @@ const navLinks = [
   { href: "/compare", label: "Compare" },
 ];
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const [seasonData, selected] = await Promise.all([
+    getSeasons().catch(() => null),
+    currentSeason(),
+  ]);
+  const seasons = seasonData?.seasons ?? [];
+  const current = selected ?? seasonData?.default ?? "E2025";
   return (
     <html
       lang="en"
@@ -70,9 +79,7 @@ export default function RootLayout({
             </nav>
             <div className="ml-auto flex items-center gap-3">
               <SearchBox />
-              <span className="hidden text-xs text-neutral-500 sm:inline">
-                2025-26
-              </span>
+              <SeasonSelect seasons={seasons} current={current} />
             </div>
           </div>
         </header>

@@ -3,6 +3,7 @@ export const metadata = { title: "Standings" };
 import Link from "next/link";
 import PositionChart from "@/components/PositionChart";
 import { getStandings, getStandingsHistory } from "@/lib/api";
+import { currentSeason } from "@/lib/season";
 
 export default async function StandingsPage({
   searchParams,
@@ -10,10 +11,11 @@ export default async function StandingsPage({
   searchParams: Promise<{ round?: string }>;
 }) {
   const params = await searchParams;
+  const season = await currentSeason();
   const requested = params.round ? Number(params.round) : undefined;
   const [{ round, standings }, history] = await Promise.all([
-    getStandings(requested),
-    getStandingsHistory(),
+    getStandings(requested, season),
+    getStandingsHistory(season),
   ]);
   const maxRound = Math.max(
     1,

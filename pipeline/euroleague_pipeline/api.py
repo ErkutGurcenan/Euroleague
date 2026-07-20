@@ -19,10 +19,18 @@ class EuroleagueApi:
 
     def _get(self, path: str, params: dict[str, Any] | None = None) -> Any:
         url = f"{BASE_URL}/competitions/{self.competition}{path}"
-        resp = self.session.get(url, params=params, timeout=30)
+        backoff = 15.0
+        for _ in range(6):
+            resp = self.session.get(url, params=params, timeout=30)
+            if resp.status_code == 429:
+                time.sleep(max(float(resp.headers.get("Retry-After") or 0), backoff))
+                backoff *= 2
+                continue
+            resp.raise_for_status()
+            time.sleep(REQUEST_DELAY_S)
+            return resp.json()
         resp.raise_for_status()
-        time.sleep(REQUEST_DELAY_S)
-        return resp.json()
+        raise RuntimeError("unreachable")
 
     def _paginate(self, path: str) -> Iterator[dict]:
         offset = 0

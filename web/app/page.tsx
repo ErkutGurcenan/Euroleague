@@ -9,6 +9,7 @@ import {
   getStandings,
   type PlayerSummary,
 } from "@/lib/api";
+import { currentSeason, seasonLabel } from "@/lib/season";
 
 const AWARD_ICONS: Record<string, string> = {
   MVP: "🏅",
@@ -45,13 +46,15 @@ function LeaderRow({
 }
 
 export default async function HomePage() {
+  const season = await currentSeason();
   const [standings, players, highs, games, awards] = await Promise.all([
-    getStandings(),
-    getPlayers(),
-    getHighs(),
-    getGames(),
-    getAwards(),
+    getStandings(undefined, season),
+    getPlayers(season),
+    getHighs(season),
+    getGames(season),
+    getAwards(season),
   ]);
+  const label = seasonLabel(games.season);
 
   const ffGames = games.games.filter((g) => g.phaseType === "FF");
   const final = ffGames.find((g) =>
@@ -107,7 +110,7 @@ export default async function HomePage() {
           )}
           <div className="min-w-0">
             <div className="text-xs uppercase tracking-wide text-orange-400">
-              🏆 2025-26 EuroLeague champions
+              🏆 {label} EuroLeague champions
             </div>
             <div className="truncate text-xl font-bold">{champion.name}</div>
             <div className="text-sm text-neutral-400">
@@ -119,6 +122,7 @@ export default async function HomePage() {
       )}
 
       {/* awards shelf */}
+      {awards.awards.length > 0 && (
       <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
         {awards.awards.map((a) => (
           <Link
@@ -140,6 +144,7 @@ export default async function HomePage() {
           </Link>
         ))}
       </div>
+      )}
 
       {/* standings + leaders */}
       <div className="mb-6 grid gap-4 lg:grid-cols-2">

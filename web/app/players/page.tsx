@@ -4,6 +4,7 @@ import Link from "next/link";
 import Headshot from "@/components/Headshot";
 import TeamFilterSelect from "@/components/TeamFilterSelect";
 import { getPlayers, getTransfers, type PlayerSummary } from "@/lib/api";
+import { currentSeason } from "@/lib/season";
 
 const POSITIONS = ["Guard", "Forward", "Center"];
 
@@ -26,9 +27,10 @@ export default async function PlayersPage({
   const sortKey = SORTS[params.sort ?? "pir"] ? params.sort ?? "pir" : "pir";
   const team = params.team ?? null;
   const pos = params.pos && POSITIONS.includes(params.pos) ? params.pos : null;
+  const season = await currentSeason();
   const [{ players, minGames }, { transfers }] = await Promise.all([
-    getPlayers(),
-    getTransfers(),
+    getPlayers(season),
+    getTransfers(season),
   ]);
   const teams = [
     ...new Map(
