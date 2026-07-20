@@ -1,5 +1,6 @@
 import Link from "next/link";
 import GameCard from "@/components/GameCard";
+import Headshot from "@/components/Headshot";
 import {
   getAwards,
   getGames,
@@ -28,6 +29,7 @@ function LeaderRow({
   return (
     <li className="flex items-center gap-2 border-t border-neutral-800/40 py-1.5 text-sm first:border-t-0">
       <span className="w-9 text-xs uppercase text-neutral-500">{label}</span>
+      <Headshot src={player.imageUrl} name={player.name} size={22} />
       <Link
         href={`/players/${player.playerCode}`}
         className="min-w-0 flex-1 truncate hover:text-orange-400"

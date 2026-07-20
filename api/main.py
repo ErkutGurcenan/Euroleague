@@ -150,6 +150,7 @@ def search(q: str = Query(min_length=2), season: str = DEFAULT_SEASON) -> dict:
                 PersonStint.person_code,
                 func.max(PersonStint.name),
                 func.max(PersonStint.club_code),
+                func.max(PersonStint.image_url),
             )
             .where(
                 PersonStint.season_code == season,
@@ -166,23 +167,28 @@ def search(q: str = Query(min_length=2), season: str = DEFAULT_SEASON) -> dict:
                 {
                     "playerCode": code,
                     "name": name,
+                    "imageUrl": image_url,
                     "clubCode": club_code,
                     "clubName": club_map[club_code].name
                     if club_code in club_map
                     else None,
                 }
-                for code, name, club_code in players
+                for code, name, club_code, image_url in players
             ],
         }
 
 
-def club_splits(session, season: str) -> dict[str, dict]:
-    """Home/away records and last-5 form per club from RS game results."""
-    games = session.execute(
+def club_splits(session, season: str, up_to_round: Optional[int] = None) -> dict[str, dict]:
+    """Home/away records and last-5 form per club from RS game results,
+    optionally only counting rounds up to `up_to_round` (time machine)."""
+    q = (
         select(Game)
         .where(Game.season_code == season, Game.played, Game.phase_type == "RS")
         .order_by(Game.utc_date)
-    ).scalars().all()
+    )
+    if up_to_round is not None:
+        q = q.where(Game.round <= up_to_round)
+    games = session.execute(q).scalars().all()
     splits: dict[str, dict] = {}
     for gm in games:
         if gm.local_score is None or gm.road_score is None:
@@ -219,7 +225,7 @@ def standings(season: str = DEFAULT_SEASON, round: Optional[int] = Query(None)) 
         if rnd is None:
             raise HTTPException(404, f"no standings for season {season}")
         clubs = load_clubs(session)
-        splits = club_splits(session, season)
+        splits = club_splits(session, season, up_to_round=rnd)
         rows = session.execute(
             select(StandingRow)
             .where(StandingRow.season_code == season, StandingRow.round == rnd)
@@ -626,6 +632,14 @@ def players_index(
             .group_by(g.player_code)
             .having(func.count() >= threshold)
         ).all()
+        images = {
+            code: url
+            for code, url in session.execute(
+                select(PersonStint.person_code, func.max(PersonStint.image_url))
+                .where(PersonStint.season_code == season, PersonStint.type == "J")
+                .group_by(PersonStint.person_code)
+            )
+        }
         # last club each player appeared for, for crest/label
         last_club: dict[str, str] = {}
         for pc, cc in session.execute(
@@ -646,6 +660,7 @@ def players_index(
                 {
                     "playerCode": code,
                     "name": name,
+                    "imageUrl": images.get(code),
                     "club": club_dict(club) if club else None,
                     "gamesPlayed": gp,
                     "minutes": round((secs or 0) / 60.0 / gp, 1),
