@@ -109,6 +109,7 @@ export type PlayerSummary = {
   playerCode: string;
   name: string;
   imageUrl: string | null;
+  position: string | null;
   club: ClubSummary | null;
   gamesPlayed: number;
   minutes: number;

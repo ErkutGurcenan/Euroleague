@@ -593,91 +593,107 @@ def pct(made, attempted) -> Optional[float]:
     return round(100.0 * (made or 0) / attempted, 1)
 
 
+def player_summaries(
+    session, season: str, min_games: Optional[int] = None
+) -> tuple[int, list[dict]]:
+    """Aggregated per-game averages for every player over the threshold.
+
+    Default games threshold adapts to how much of the season is ingested,
+    so consumers are never empty during a backfill.
+    """
+    g = PlayerGameStat
+    max_gp = (
+        session.execute(
+            select(func.count())
+            .where(g.season_code == season)
+            .group_by(g.player_code)
+            .order_by(func.count().desc())
+            .limit(1)
+        ).scalar()
+        or 0
+    )
+    threshold = min_games if min_games is not None else max(1, max_gp // 2)
+    rows = session.execute(
+        select(
+            g.player_code,
+            func.max(g.player_name),
+            func.count().label("gp"),
+            func.sum(g.seconds_played),
+            func.sum(g.points),
+            func.sum(g.fg2m), func.sum(g.fg2a),
+            func.sum(g.fg3m), func.sum(g.fg3a),
+            func.sum(g.ftm), func.sum(g.fta),
+            func.sum(g.treb), func.sum(g.ast), func.sum(g.stl),
+            func.sum(g.tov), func.sum(g.blk), func.sum(g.pir),
+        )
+        .where(g.season_code == season)
+        .group_by(g.player_code)
+        .having(func.count() >= threshold)
+    ).all()
+    stint_info = {
+        code: {"imageUrl": url, "position": pos}
+        for code, url, pos in session.execute(
+            select(
+                PersonStint.person_code,
+                func.max(PersonStint.image_url),
+                func.max(PersonStint.position_name),
+            )
+            .where(PersonStint.season_code == season, PersonStint.type == "J")
+            .group_by(PersonStint.person_code)
+        )
+    }
+    # last club each player appeared for, for crest/label
+    last_club: dict[str, str] = {}
+    for pc, cc in session.execute(
+        select(g.player_code, g.club_code)
+        .where(g.season_code == season)
+        .order_by(g.game_code)
+    ):
+        last_club[pc] = cc
+    clubs = load_clubs(session)
+
+    players = []
+    for (
+        code, name, gp, secs, pts, fg2m, fg2a, fg3m, fg3a,
+        ftm, fta, treb, ast, stl, tov, blk, pir,
+    ) in rows:
+        club = clubs.get(last_club.get(code, ""))
+        info = stint_info.get(code, {})
+        players.append(
+            {
+                "playerCode": code,
+                "name": name,
+                "imageUrl": info.get("imageUrl"),
+                "position": info.get("position"),
+                "club": club_dict(club) if club else None,
+                "gamesPlayed": gp,
+                "minutes": round((secs or 0) / 60.0 / gp, 1),
+                "points": round((pts or 0) / gp, 1),
+                "rebounds": round((treb or 0) / gp, 1),
+                "assists": round((ast or 0) / gp, 1),
+                "steals": round((stl or 0) / gp, 1),
+                "turnovers": round((tov or 0) / gp, 1),
+                "blocks": round((blk or 0) / gp, 1),
+                "pir": round((pir or 0) / gp, 1),
+                "fg2Pct": pct(fg2m, fg2a),
+                "fg3Pct": pct(fg3m, fg3a),
+                "ftPct": pct(ftm, fta),
+            }
+        )
+    return threshold, players
+
+
 @app.get("/api/players")
 def players_index(
     season: str = DEFAULT_SEASON, min_games: Optional[int] = Query(None)
 ) -> dict:
-    """Season leaderboard aggregated from box scores (per-game averages).
-
-    Default games threshold adapts to how much of the season is ingested,
-    so the leaderboard is never empty during a backfill.
-    """
-    g = PlayerGameStat
+    """Season leaderboard aggregated from box scores (per-game averages)."""
     with Session(engine) as session:
-        max_gp = (
-            session.execute(
-                select(func.count())
-                .where(g.season_code == season)
-                .group_by(g.player_code)
-                .order_by(func.count().desc())
-                .limit(1)
-            ).scalar()
-            or 0
-        )
-        threshold = min_games if min_games is not None else max(1, max_gp // 2)
-        rows = session.execute(
-            select(
-                g.player_code,
-                func.max(g.player_name),
-                func.count().label("gp"),
-                func.sum(g.seconds_played),
-                func.sum(g.points),
-                func.sum(g.fg2m), func.sum(g.fg2a),
-                func.sum(g.fg3m), func.sum(g.fg3a),
-                func.sum(g.ftm), func.sum(g.fta),
-                func.sum(g.treb), func.sum(g.ast), func.sum(g.stl),
-                func.sum(g.tov), func.sum(g.blk), func.sum(g.pir),
-            )
-            .where(g.season_code == season)
-            .group_by(g.player_code)
-            .having(func.count() >= threshold)
-        ).all()
-        images = {
-            code: url
-            for code, url in session.execute(
-                select(PersonStint.person_code, func.max(PersonStint.image_url))
-                .where(PersonStint.season_code == season, PersonStint.type == "J")
-                .group_by(PersonStint.person_code)
-            )
-        }
-        # last club each player appeared for, for crest/label
-        last_club: dict[str, str] = {}
-        for pc, cc in session.execute(
-            select(g.player_code, g.club_code)
-            .where(g.season_code == season)
-            .order_by(g.game_code)
-        ):
-            last_club[pc] = cc
-        clubs = load_clubs(session)
-
-        players = []
-        for (
-            code, name, gp, secs, pts, fg2m, fg2a, fg3m, fg3a,
-            ftm, fta, treb, ast, stl, tov, blk, pir,
-        ) in rows:
-            club = clubs.get(last_club.get(code, ""))
-            players.append(
-                {
-                    "playerCode": code,
-                    "name": name,
-                    "imageUrl": images.get(code),
-                    "club": club_dict(club) if club else None,
-                    "gamesPlayed": gp,
-                    "minutes": round((secs or 0) / 60.0 / gp, 1),
-                    "points": round((pts or 0) / gp, 1),
-                    "rebounds": round((treb or 0) / gp, 1),
-                    "assists": round((ast or 0) / gp, 1),
-                    "steals": round((stl or 0) / gp, 1),
-                    "turnovers": round((tov or 0) / gp, 1),
-                    "blocks": round((blk or 0) / gp, 1),
-                    "pir": round((pir or 0) / gp, 1),
-                    "fg2Pct": pct(fg2m, fg2a),
-                    "fg3Pct": pct(fg3m, fg3a),
-                    "ftPct": pct(ftm, fta),
-                }
-            )
+        threshold, players = player_summaries(session, season, min_games)
         players.sort(key=lambda p: -p["pir"])
         return {"season": season, "minGames": threshold, "players": players}
+
+
 
 
 HIGH_CATEGORIES = [
