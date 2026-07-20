@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
 import Logo from "@/components/Logo";
+import MobileNav from "@/components/MobileNav";
 import SearchBox from "@/components/SearchBox";
 import "./globals.css";
 
@@ -55,7 +56,8 @@ export default function RootLayout({
               <Logo size={30} />
               Eurostepper
             </Link>
-            <nav className="flex gap-4 text-sm text-neutral-300">
+            <MobileNav links={navLinks} />
+            <nav className="hidden gap-4 text-sm text-neutral-300 md:flex">
               {navLinks.map((l) => (
                 <Link
                   key={l.href}
@@ -68,7 +70,9 @@ export default function RootLayout({
             </nav>
             <div className="ml-auto flex items-center gap-3">
               <SearchBox />
-              <span className="text-xs text-neutral-500">2025-26</span>
+              <span className="hidden text-xs text-neutral-500 sm:inline">
+                2025-26
+              </span>
             </div>
           </div>
         </header>

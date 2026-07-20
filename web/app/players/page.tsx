@@ -2,7 +2,7 @@ export const metadata = { title: "Players" };
 
 import Link from "next/link";
 import Headshot from "@/components/Headshot";
-import { getPlayers, type PlayerSummary } from "@/lib/api";
+import { getPlayers, getTransfers, type PlayerSummary } from "@/lib/api";
 
 const SORTS: Record<string, { label: string; key: keyof PlayerSummary }> = {
   pir: { label: "PIR", key: "pir" },
@@ -21,7 +21,10 @@ export default async function PlayersPage({
 }) {
   const params = await searchParams;
   const sortKey = SORTS[params.sort ?? "pir"] ? params.sort ?? "pir" : "pir";
-  const { players, minGames } = await getPlayers();
+  const [{ players, minGames }, { transfers }] = await Promise.all([
+    getPlayers(),
+    getTransfers(),
+  ]);
   const sorted = [...players].sort(
     (a, b) => (b[SORTS[sortKey].key] as number) - (a[SORTS[sortKey].key] as number),
   );
@@ -120,6 +123,56 @@ export default async function PlayersPage({
           </tbody>
         </table>
       </div>
+
+      {transfers.length > 0 && (
+        <>
+          <h2 className="mb-3 mt-8 text-lg font-semibold">
+            Mid-season transfers
+          </h2>
+          <div className="overflow-hidden rounded-lg border border-neutral-800">
+            {transfers.map((t) => (
+              <Link
+                key={`${t.playerCode}-${t.date}`}
+                href={`/players/${t.playerCode}`}
+                className="flex items-center gap-3 border-t border-neutral-800/60 px-4 py-2 text-sm first:border-t-0 hover:bg-neutral-900/60"
+              >
+                <span className="w-20 shrink-0 text-xs text-neutral-500">
+                  {t.date
+                    ? new Date(t.date).toLocaleDateString("en-GB", {
+                        day: "numeric",
+                        month: "short",
+                      })
+                    : ""}
+                </span>
+                <span className="min-w-0 flex-1 truncate font-medium">
+                  {t.name}
+                </span>
+                <span className="flex items-center gap-1.5 text-neutral-400">
+                  {t.from?.crestUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={t.from.crestUrl}
+                      alt=""
+                      className="h-4 w-4 object-contain"
+                    />
+                  )}
+                  {t.from?.code}
+                  <span className="text-neutral-600">→</span>
+                  {t.to?.crestUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={t.to.crestUrl}
+                      alt=""
+                      className="h-4 w-4 object-contain"
+                    />
+                  )}
+                  {t.to?.code}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }
