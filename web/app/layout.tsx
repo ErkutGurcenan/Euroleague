@@ -36,6 +36,7 @@ const navLinks = [
   { href: "/players", label: "Players" },
   { href: "/highs", label: "Highs" },
   { href: "/notable", label: "Notable" },
+  { href: "/honor", label: "Honor" },
   { href: "/compare", label: "Compare" },
 ];
 

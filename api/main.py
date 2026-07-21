@@ -121,6 +121,84 @@ def seasons() -> dict:
         }
 
 
+AWARD_ORDER = ["MVP", "Final Four MVP", "Rising Star", "Best Defender"]
+
+
+@app.get("/api/honor")
+def honor_roll() -> dict:
+    """Season-by-season roll of honor: champion + individual awards."""
+    with Session(engine) as session:
+        clubs = load_clubs(session)
+        season_codes = sorted(
+            session.execute(select(Game.season_code).distinct()).scalars(),
+            reverse=True,
+        )
+        # champions from each season's Final Four championship game
+        champions: dict[str, dict] = {}
+        for gm in session.execute(
+            select(Game).where(
+                Game.phase_type == "FF", Game.played
+            )
+        ).scalars():
+            name = (gm.group_name or "").upper()
+            if "CHAMPIONSHIP" not in name:
+                continue
+            if gm.local_score is None or gm.road_score is None:
+                continue
+            win = gm.local_club_code if gm.local_score > gm.road_score else gm.road_club_code
+            club = clubs.get(win)
+            if club:
+                champions[gm.season_code] = {
+                    "code": club.code,
+                    "name": club.name,
+                    "crestUrl": club.crest_url,
+                }
+        # all awards, with player names resolved from box scores
+        award_rows = session.execute(select(Award)).scalars().all()
+        names = {
+            code: name
+            for code, name in session.execute(
+                select(PlayerGameStat.player_code, func.max(PlayerGameStat.player_name))
+                .group_by(PlayerGameStat.player_code)
+            )
+        }
+        images = {
+            code: url
+            for code, url in session.execute(
+                select(PersonStint.person_code, func.max(PersonStint.image_url))
+                .where(PersonStint.type == "J")
+                .group_by(PersonStint.person_code)
+            )
+        }
+        by_season: dict[str, dict] = {}
+        for a in award_rows:
+            club = clubs.get(a.club_code)
+            by_season.setdefault(a.season_code, {})[a.award] = {
+                "playerCode": a.player_code,
+                "name": names.get(a.player_code),
+                "imageUrl": images.get(a.player_code),
+                "clubCode": a.club_code,
+                "clubCrest": club.crest_url if club else None,
+            }
+
+        return {
+            "awardTypes": AWARD_ORDER,
+            "seasons": [
+                {
+                    "season": sc,
+                    "seasonLabel": season_label(sc),
+                    "canceled": sc in CANCELED_SEASONS,
+                    "note": CANCELED_SEASONS.get(sc),
+                    "champion": champions.get(sc),
+                    "awards": {
+                        t: by_season.get(sc, {}).get(t) for t in AWARD_ORDER
+                    },
+                }
+                for sc in season_codes
+            ],
+        }
+
+
 @app.get("/api/awards")
 def awards(season: str = DEFAULT_SEASON) -> dict:
     with Session(engine) as session:

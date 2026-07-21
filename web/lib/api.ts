@@ -432,6 +432,27 @@ export function getAwards(season?: string) {
   );
 }
 
+export type HonorAward = {
+  playerCode: string;
+  name: string | null;
+  imageUrl: string | null;
+  clubCode: string | null;
+  clubCrest: string | null;
+} | null;
+
+export type HonorSeason = {
+  season: string;
+  seasonLabel: string;
+  canceled: boolean;
+  note: string | null;
+  champion: { code: string; name: string; crestUrl: string | null } | null;
+  awards: Record<string, HonorAward>;
+};
+
+export function getHonorRoll() {
+  return get<{ awardTypes: string[]; seasons: HonorSeason[] }>(`/api/honor`);
+}
+
 export type SearchResults = {
   clubs: ClubSummary[];
   players: {
