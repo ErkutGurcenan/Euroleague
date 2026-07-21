@@ -891,6 +891,116 @@ def transfers(season: str = DEFAULT_SEASON) -> dict:
         return {"season": season, "transfers": moves}
 
 
+@app.get("/api/players/{player_code}/career")
+def player_career(player_code: str) -> dict:
+    """A player's stats across every season in the database."""
+    g = PlayerGameStat
+    with Session(engine) as session:
+        rows = session.execute(
+            select(
+                g.season_code,
+                func.count().label("gp"),
+                func.sum(g.seconds_played),
+                func.sum(g.points),
+                func.sum(g.fg2m), func.sum(g.fg2a),
+                func.sum(g.fg3m), func.sum(g.fg3a),
+                func.sum(g.ftm), func.sum(g.fta),
+                func.sum(g.treb), func.sum(g.ast), func.sum(g.pir),
+            )
+            .where(g.player_code == player_code)
+            .group_by(g.season_code)
+            .order_by(g.season_code)
+        ).all()
+        if not rows:
+            raise HTTPException(404, f"no games for player {player_code}")
+
+        clubs = load_clubs(session)
+        # primary club per season = most games that season
+        season_club: dict[str, str] = {}
+        for season_code, club_code, _ in session.execute(
+            select(g.season_code, g.club_code, func.count().label("n"))
+            .where(g.player_code == player_code)
+            .group_by(g.season_code, g.club_code)
+            .order_by(g.season_code, func.count().desc())
+        ):
+            season_club.setdefault(season_code, club_code)
+
+        identity = session.execute(
+            select(
+                func.max(PersonStint.name),
+                func.max(PersonStint.position_name),
+                func.max(PersonStint.image_url),
+            ).where(PersonStint.person_code == player_code, PersonStint.type == "J")
+        ).one()
+        name_fallback = rows[-1][0]  # season code, replaced below if we have a name
+
+        awards = [
+            {
+                "season": a.season_code,
+                "seasonLabel": season_label(a.season_code),
+                "award": a.award,
+            }
+            for a in session.execute(
+                select(Award)
+                .where(Award.player_code == player_code)
+                .order_by(Award.season_code)
+            ).scalars()
+        ]
+
+        seasons = []
+        tot = {k: 0 for k in
+               ("gp", "secs", "pts", "fg2m", "fg2a", "fg3m", "fg3a",
+                "ftm", "fta", "treb", "ast", "pir")}
+        for (sc, gp, secs, pts, fg2m, fg2a, fg3m, fg3a,
+             ftm, fta, treb, ast, pir) in rows:
+            club = clubs.get(season_club.get(sc))
+            for k, v in zip(
+                ("gp", "secs", "pts", "fg2m", "fg2a", "fg3m", "fg3a",
+                 "ftm", "fta", "treb", "ast", "pir"),
+                (gp, secs, pts, fg2m, fg2a, fg3m, fg3a, ftm, fta, treb, ast, pir),
+            ):
+                tot[k] += v or 0
+            seasons.append({
+                "season": sc,
+                "seasonLabel": season_label(sc),
+                "clubCode": club.code if club else None,
+                "clubName": club.name if club else None,
+                "crestUrl": club.crest_url if club else None,
+                "gamesPlayed": gp,
+                "minutes": round((secs or 0) / 60.0 / gp, 1) if gp else None,
+                "points": round((pts or 0) / gp, 1) if gp else None,
+                "rebounds": round((treb or 0) / gp, 1) if gp else None,
+                "assists": round((ast or 0) / gp, 1) if gp else None,
+                "pir": round((pir or 0) / gp, 1) if gp else None,
+                "fg2Pct": pct(fg2m, fg2a),
+                "fg3Pct": pct(fg3m, fg3a),
+                "ftPct": pct(ftm, fta),
+            })
+
+        n = tot["gp"]
+        career = {
+            "gamesPlayed": n,
+            "minutes": round(tot["secs"] / 60.0 / n, 1) if n else None,
+            "points": round(tot["pts"] / n, 1) if n else None,
+            "rebounds": round(tot["treb"] / n, 1) if n else None,
+            "assists": round(tot["ast"] / n, 1) if n else None,
+            "pir": round(tot["pir"] / n, 1) if n else None,
+            "fg2Pct": pct(tot["fg2m"], tot["fg2a"]),
+            "fg3Pct": pct(tot["fg3m"], tot["fg3a"]),
+            "ftPct": pct(tot["ftm"], tot["fta"]),
+        }
+        return {
+            "playerCode": player_code,
+            "name": identity[0] or name_fallback,
+            "positionName": identity[1],
+            "imageUrl": identity[2],
+            "seasonsPlayed": len(seasons),
+            "awards": awards,
+            "seasons": seasons,
+            "career": career,
+        }
+
+
 @app.get("/api/players/{player_code}")
 def player_detail(player_code: str, season: str = DEFAULT_SEASON) -> dict:
     g = PlayerGameStat

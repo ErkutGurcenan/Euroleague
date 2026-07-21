@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import GameLogChart from "@/components/GameLogChart";
+import PlayerViewToggle from "@/components/PlayerViewToggle";
 import ShotChartExplorer from "@/components/ShotChartExplorer";
 import { getPlayer, getPlayerShots } from "@/lib/api";
 import { currentSeason } from "@/lib/season";
@@ -57,7 +58,7 @@ export default async function PlayerPage({
             className="h-20 w-20 rounded-full border border-neutral-800 object-cover"
           />
         )}
-        <div>
+        <div className="min-w-0 flex-1">
           <h1 className="text-2xl font-bold">
             {player.dorsal && (
               <span className="mr-2 text-neutral-500">#{player.dorsal}</span>
@@ -78,6 +79,7 @@ export default async function PlayerPage({
             {player.country && ` · ${player.country}`}
           </p>
         </div>
+        <PlayerViewToggle code={code} active="season" />
       </div>
 
       <div className="mb-8 grid grid-cols-3 gap-3 sm:grid-cols-6">

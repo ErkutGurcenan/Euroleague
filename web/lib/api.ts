@@ -266,6 +266,38 @@ export function getPlayer(code: string, season?: string) {
   return get<PlayerDetail>(`/api/players/${code}${qs({ season })}`);
 }
 
+export type CareerSeason = {
+  season: string;
+  seasonLabel: string;
+  clubCode: string | null;
+  clubName: string | null;
+  crestUrl: string | null;
+  gamesPlayed: number;
+  minutes: number | null;
+  points: number | null;
+  rebounds: number | null;
+  assists: number | null;
+  pir: number | null;
+  fg2Pct: number | null;
+  fg3Pct: number | null;
+  ftPct: number | null;
+};
+
+export type PlayerCareer = {
+  playerCode: string;
+  name: string;
+  positionName: string | null;
+  imageUrl: string | null;
+  seasonsPlayed: number;
+  awards: { season: string; seasonLabel: string; award: string }[];
+  seasons: CareerSeason[];
+  career: Omit<CareerSeason, "season" | "seasonLabel" | "clubCode" | "clubName" | "crestUrl">;
+};
+
+export function getPlayerCareer(code: string) {
+  return get<PlayerCareer>(`/api/players/${code}/career`);
+}
+
 export function getPlayerShots(code: string, season?: string) {
   return get<{ season: string; total: number; shots: ShotPoint[] }>(
     `/api/players/${code}/shots${qs({ season })}`,
