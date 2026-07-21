@@ -605,7 +605,22 @@ def clubs_index(season: str = DEFAULT_SEASON) -> dict:
                 )
             ).scalars()
         }
-        rows = session.execute(select(Club).order_by(Club.name)).scalars()
+        # clubs that actually participated in this season (appeared in a game)
+        participants = set(
+            session.execute(
+                select(Game.local_club_code).where(Game.season_code == season)
+            ).scalars()
+        ) | set(
+            session.execute(
+                select(Game.road_club_code).where(Game.season_code == season)
+            ).scalars()
+        )
+        participants.discard(None)
+        rows = session.execute(
+            select(Club)
+            .where(Club.code.in_(participants))
+            .order_by(Club.name)
+        ).scalars()
         clubs = []
         for c in rows:
             st = table.get(c.code)
