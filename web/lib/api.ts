@@ -172,6 +172,8 @@ export type PlayerDetail = {
     points: number;
     rebounds: number;
     assists: number;
+    steals: number;
+    blocks: number;
     pir: number;
     fg2Pct: number | null;
     fg3Pct: number | null;
@@ -430,6 +432,59 @@ export function getAwards(season?: string) {
   return get<{ season: string; awards: AwardEntry[] }>(
     `/api/awards${qs({ season })}`,
   );
+}
+
+export type AllTimeEntry = {
+  playerCode: string;
+  name: string | null;
+  imageUrl: string | null;
+  clubCode: string | null;
+  clubCrest: string | null;
+  seasonsPlayed: number;
+  games: number;
+  value: number;
+};
+
+export type AllTimeCategory = {
+  key: string;
+  label: string;
+  unit: string;
+  rate: boolean;
+  entries: AllTimeEntry[];
+};
+
+export function getAllTimeLeaders() {
+  return get<{
+    minGames: number;
+    totals: AllTimeCategory[];
+    averages: AllTimeCategory[];
+  }>(`/api/leaderboards/alltime`);
+}
+
+export type ChampionClub = {
+  code: string;
+  name: string;
+  crestUrl: string | null;
+  titles: number;
+};
+
+export type FinalEntry = {
+  season: string;
+  seasonLabel: string;
+  gameCode: number;
+  champion: { code: string; name: string; crestUrl: string | null };
+  runnerUp: { code: string; name: string; crestUrl: string | null };
+  championScore: number;
+  runnerUpScore: number;
+  finalFourMvp: { playerCode: string; name: string | null } | null;
+};
+
+export function getChampions() {
+  return get<{
+    titlesByClub: ChampionClub[];
+    finals: FinalEntry[];
+    canceled: { season: string; seasonLabel: string; note: string }[];
+  }>(`/api/champions`);
 }
 
 export type HonorAward = {

@@ -82,12 +82,14 @@ export default async function PlayerPage({
         <PlayerViewToggle code={code} active="season" />
       </div>
 
-      <div className="mb-8 grid grid-cols-3 gap-3 sm:grid-cols-6">
+      <div className="mb-8 grid grid-cols-4 gap-3 sm:grid-cols-8">
         <StatCard label="Games" value={a.gamesPlayed} />
         <StatCard label="Min" value={a.minutes} />
         <StatCard label="Pts" value={a.points} />
         <StatCard label="Reb" value={a.rebounds} />
         <StatCard label="Ast" value={a.assists} />
+        <StatCard label="Stl" value={a.steals} />
+        <StatCard label="Blk" value={a.blocks} />
         <StatCard label="PIR" value={a.pir} />
       </div>
 
@@ -139,6 +141,8 @@ export default async function PlayerPage({
               <th className="px-2 py-2 text-right">Pts</th>
               <th className="px-2 py-2 text-right">Reb</th>
               <th className="px-2 py-2 text-right">Ast</th>
+              <th className="px-2 py-2 text-right">Stl</th>
+              <th className="px-2 py-2 text-right">Blk</th>
               <th className="px-2 py-2 text-right">2P</th>
               <th className="px-2 py-2 text-right">3P</th>
               <th className="px-2 py-2 text-right">FT</th>
@@ -170,6 +174,8 @@ export default async function PlayerPage({
                 </td>
                 <td className="px-2 py-2 text-right tabular-nums">{g.rebounds}</td>
                 <td className="px-2 py-2 text-right tabular-nums">{g.assists}</td>
+                <td className="px-2 py-2 text-right tabular-nums">{g.steals}</td>
+                <td className="px-2 py-2 text-right tabular-nums">{g.blocks}</td>
                 <td className="px-2 py-2 text-right tabular-nums">
                   {g.fg2}
                 </td>

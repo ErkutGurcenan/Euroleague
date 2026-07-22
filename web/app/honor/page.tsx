@@ -44,9 +44,12 @@ export default async function HonorPage() {
     <div>
       <div className="mb-4 flex items-baseline justify-between">
         <h1 className="text-2xl font-bold">Roll of honor</h1>
-        <span className="text-sm text-neutral-400">
-          Champions and award winners by season
-        </span>
+        <Link
+          href="/champions"
+          className="text-sm text-orange-400 hover:underline"
+        >
+          Champions history →
+        </Link>
       </div>
       <div className="overflow-x-auto rounded-lg border border-neutral-800">
         <table className="w-full border-collapse text-sm">

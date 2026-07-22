@@ -199,6 +199,85 @@ def honor_roll() -> dict:
         }
 
 
+@app.get("/api/champions")
+def champions() -> dict:
+    """Finals history: champion, runner-up, score, F4 MVP per season,
+    plus a titles-by-club tally."""
+    with Session(engine) as session:
+        clubs = load_clubs(session)
+        season_codes = sorted(
+            session.execute(select(Game.season_code).distinct()).scalars(),
+            reverse=True,
+        )
+        f4_mvp = {
+            a.season_code: a.player_code
+            for a in session.execute(
+                select(Award).where(Award.award == "Final Four MVP")
+            ).scalars()
+        }
+        names = {
+            code: name
+            for code, name in session.execute(
+                select(PlayerGameStat.player_code, func.max(PlayerGameStat.player_name))
+                .where(PlayerGameStat.player_code.in_(list(f4_mvp.values())))
+                .group_by(PlayerGameStat.player_code)
+            )
+        }
+
+        def club_mini(code):
+            c = clubs.get(code)
+            return {"code": c.code, "name": c.name, "crestUrl": c.crest_url} if c else None
+
+        finals = []
+        titles: dict[str, int] = {}
+        for gm in session.execute(
+            select(Game).where(Game.phase_type == "FF", Game.played)
+        ).scalars():
+            if "CHAMPIONSHIP" not in (gm.group_name or "").upper():
+                continue
+            if gm.local_score is None or gm.road_score is None:
+                continue
+            home_won = gm.local_score > gm.road_score
+            champ = gm.local_club_code if home_won else gm.road_club_code
+            runner = gm.road_club_code if home_won else gm.local_club_code
+            cs = max(gm.local_score, gm.road_score)
+            rs = min(gm.local_score, gm.road_score)
+            titles[champ] = titles.get(champ, 0) + 1
+            mvp_code = f4_mvp.get(gm.season_code)
+            finals.append({
+                "season": gm.season_code,
+                "seasonLabel": season_label(gm.season_code),
+                "gameCode": gm.game_code,
+                "champion": club_mini(champ),
+                "runnerUp": club_mini(runner),
+                "championScore": cs,
+                "runnerUpScore": rs,
+                "finalFourMvp": (
+                    {"playerCode": mvp_code, "name": names.get(mvp_code)}
+                    if mvp_code else None
+                ),
+            })
+        finals.sort(key=lambda f: f["season"], reverse=True)
+
+        titles_by_club = sorted(
+            (
+                {**club_mini(code), "titles": n}
+                for code, n in titles.items() if clubs.get(code)
+            ),
+            key=lambda t: (-t["titles"], t["name"]),
+        )
+        canceled = [
+            {"season": sc, "seasonLabel": season_label(sc),
+             "note": CANCELED_SEASONS[sc]}
+            for sc in season_codes if sc in CANCELED_SEASONS
+        ]
+        return {
+            "titlesByClub": titles_by_club,
+            "finals": finals,
+            "canceled": canceled,
+        }
+
+
 @app.get("/api/awards")
 def awards(season: str = DEFAULT_SEASON) -> dict:
     with Session(engine) as session:
@@ -822,6 +901,91 @@ def players_index(
 
 
 
+@app.get("/api/leaderboards/alltime")
+def alltime_leaderboards(limit: int = 10, min_games: int = 50) -> dict:
+    """Career leaders across all seasons — totals and per-game rates."""
+    g = PlayerGameStat
+    with Session(engine) as session:
+        rows = session.execute(
+            select(
+                g.player_code,
+                func.max(g.player_name),
+                func.count().label("gp"),
+                func.count(func.distinct(g.season_code)).label("seasons"),
+                func.sum(g.points), func.sum(g.treb), func.sum(g.ast),
+                func.sum(g.stl), func.sum(g.blk), func.sum(g.fg3m),
+                func.sum(g.pir),
+            ).group_by(g.player_code)
+        ).all()
+        images = {
+            code: url
+            for code, url in session.execute(
+                select(PersonStint.person_code, func.max(PersonStint.image_url))
+                .where(PersonStint.type == "J")
+                .group_by(PersonStint.person_code)
+            )
+        }
+        last_club: dict[str, str] = {}
+        for pc, cc in session.execute(
+            select(g.player_code, g.club_code).order_by(g.season_code, g.game_code)
+        ):
+            last_club[pc] = cc
+        clubs = load_clubs(session)
+
+        players = []
+        for (code, name, gp, seasons, pts, treb, ast,
+             stl, blk, fg3m, pir) in rows:
+            club = clubs.get(last_club.get(code, ""))
+            players.append({
+                "playerCode": code, "name": name,
+                "imageUrl": images.get(code),
+                "clubCode": club.code if club else None,
+                "clubCrest": club.crest_url if club else None,
+                "seasonsPlayed": seasons, "games": gp,
+                "points": pts or 0, "rebounds": treb or 0, "assists": ast or 0,
+                "steals": stl or 0, "blocks": blk or 0, "threes": fg3m or 0,
+                "pir": pir or 0,
+                "ppg": round((pts or 0) / gp, 1),
+                "rpg": round((treb or 0) / gp, 1),
+                "apg": round((ast or 0) / gp, 1),
+                "pirpg": round((pir or 0) / gp, 1),
+            })
+
+        def top(key: str, label: str, unit: str, rate: bool) -> dict:
+            pool = [p for p in players if not rate or p["games"] >= min_games]
+            ranked = sorted(pool, key=lambda p: -p[key])[:limit]
+            return {
+                "key": key, "label": label, "unit": unit, "rate": rate,
+                "entries": [
+                    {**{k: p[k] for k in
+                        ("playerCode", "name", "imageUrl", "clubCode",
+                         "clubCrest", "seasonsPlayed", "games")},
+                     "value": p[key]}
+                    for p in ranked
+                ],
+            }
+
+        return {
+            "minGames": min_games,
+            "totals": [
+                top("points", "Points", "pts", False),
+                top("rebounds", "Rebounds", "reb", False),
+                top("assists", "Assists", "ast", False),
+                top("steals", "Steals", "stl", False),
+                top("blocks", "Blocks", "blk", False),
+                top("threes", "Three-pointers", "3PM", False),
+                top("games", "Games played", "g", False),
+                top("pir", "Total PIR", "pir", False),
+            ],
+            "averages": [
+                top("ppg", "Points per game", "ppg", True),
+                top("rpg", "Rebounds per game", "rpg", True),
+                top("apg", "Assists per game", "apg", True),
+                top("pirpg", "PIR per game", "pir", True),
+            ],
+        }
+
+
 HIGH_CATEGORIES = [
     ("points", "Points", PlayerGameStat.points),
     ("rebounds", "Rebounds", PlayerGameStat.treb),
@@ -1161,6 +1325,8 @@ def player_detail(player_code: str, season: str = DEFAULT_SEASON) -> dict:
                 "points": round(sum(s.points or 0 for s in stats) / gp, 1),
                 "rebounds": round(sum(s.treb or 0 for s in stats) / gp, 1),
                 "assists": round(sum(s.ast or 0 for s in stats) / gp, 1),
+                "steals": round(sum(s.stl or 0 for s in stats) / gp, 1),
+                "blocks": round(sum(s.blk or 0 for s in stats) / gp, 1),
                 "pir": round(sum(s.pir or 0 for s in stats) / gp, 1),
                 "fg2Pct": pct(
                     sum(s.fg2m or 0 for s in stats), sum(s.fg2a or 0 for s in stats)

@@ -10,7 +10,7 @@ export default function MobileNav({
 }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="relative md:hidden">
+    <div className="relative lg:hidden">
       <button
         aria-label="Menu"
         aria-expanded={open}
