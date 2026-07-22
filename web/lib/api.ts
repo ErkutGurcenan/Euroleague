@@ -345,6 +345,39 @@ export type CoachEntry = {
   active: boolean | null;
 };
 
+export type ClubHistorySeason = {
+  season: string;
+  seasonLabel: string;
+  wins: number | null;
+  losses: number | null;
+  position: number | null;
+  result:
+    | "champion"
+    | "runner_up"
+    | "final_four"
+    | "playoffs"
+    | "play_in"
+    | "regular_season"
+    | "canceled";
+};
+
+export type ClubHistory = {
+  club: { code: string; name: string; crestUrl: string | null };
+  summary: {
+    seasons: number;
+    titles: number;
+    finalFours: number;
+    bestFinish: number | null;
+    wins: number;
+    losses: number;
+  };
+  seasons: ClubHistorySeason[];
+};
+
+export function getClubHistory(code: string) {
+  return get<ClubHistory>(`/api/clubs/${code}/history`);
+}
+
 export function getClub(code: string, season?: string) {
   return get<{
     club: ClubSummary;

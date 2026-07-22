@@ -1481,6 +1481,96 @@ def club_season_stats(session, code: str, season: str) -> Optional[dict]:
     }
 
 
+@app.get("/api/clubs/{code}/history")
+def club_history(code: str) -> dict:
+    """A club's season-by-season record across every season."""
+    with Session(engine) as session:
+        club = session.get(Club, code)
+        if club is None:
+            raise HTTPException(404, f"unknown club {code}")
+
+        # per season: which phases the club played, and championship outcome
+        phases: dict[str, set] = {}
+        champ_result: dict[str, str] = {}
+        for gm in session.execute(
+            select(Game).where(
+                Game.played,
+                (Game.local_club_code == code) | (Game.road_club_code == code),
+            )
+        ).scalars():
+            phases.setdefault(gm.season_code, set()).add(gm.phase_type)
+            if gm.phase_type == "FF" and "CHAMPIONSHIP" in (gm.group_name or "").upper():
+                if gm.local_score is not None and gm.road_score is not None:
+                    home = gm.local_club_code == code
+                    won = (gm.local_score > gm.road_score) == home
+                    champ_result[gm.season_code] = "champion" if won else "runner_up"
+
+        # final-round standings row per season (position + W-L)
+        standing: dict[str, StandingRow] = {}
+        for r in session.execute(
+            select(StandingRow)
+            .where(StandingRow.club_code == code)
+            .order_by(StandingRow.round)
+        ).scalars():
+            standing[r.season_code] = r  # last (max round) wins
+
+        def result_of(sc: str) -> str:
+            if sc in CANCELED_SEASONS:
+                return "canceled"
+            if sc in champ_result:
+                return champ_result[sc]
+            ph = phases.get(sc, set())
+            if "FF" in ph:
+                return "final_four"
+            if "PO" in ph:
+                return "playoffs"
+            if "PI" in ph:
+                return "play_in"
+            return "regular_season"
+
+        season_codes = sorted(phases.keys() | standing.keys(), reverse=True)
+        seasons = []
+        titles = final_fours = tot_w = tot_l = 0
+        best = None
+        for sc in season_codes:
+            st = standing.get(sc)
+            res = result_of(sc)
+            w = st.games_won if st else None
+            losses = st.games_lost if st else None
+            pos = st.position if st else None
+            if res == "champion":
+                titles += 1
+            if res in ("champion", "runner_up", "final_four"):
+                final_fours += 1
+            if w is not None:
+                tot_w += w
+                tot_l += losses or 0
+            if pos is not None and (best is None or pos < best):
+                best = pos
+            seasons.append({
+                "season": sc,
+                "seasonLabel": season_label(sc),
+                "wins": w,
+                "losses": losses,
+                "position": pos,
+                "result": res,
+            })
+
+        return {
+            "club": {"code": club.code, "name": club.name,
+                     "crestUrl": club.crest_url},
+            "summary": {
+                "seasons": len(seasons),
+                "titles": titles,
+                "finalFours": final_fours,
+                "bestFinish": best,
+                "wins": tot_w,
+                "losses": tot_l,
+            },
+            "seasons": seasons,
+        }
+
+
 @app.get("/api/clubs/{code}")
 def club_detail(code: str, season: str = DEFAULT_SEASON) -> dict:
     with Session(engine) as session:
