@@ -199,6 +199,96 @@ def honor_roll() -> dict:
         }
 
 
+def meeting_stage(gm: Game) -> str:
+    if gm.phase_type == "FF":
+        name = (gm.group_name or "").upper()
+        if "CHAMPIONSHIP" in name:
+            return "Final"
+        if "THIRD" in name:
+            return "3rd place"
+        return "Semifinal"
+    if gm.phase_type == "PO":
+        return "Playoffs"
+    if gm.phase_type == "PI":
+        return "Play-in"
+    return gm.round_name or "Regular season"
+
+
+@app.get("/api/head-to-head")
+def head_to_head(a: str, b: str) -> dict:
+    """All-time series between two clubs across every season."""
+    a, b = a.upper(), b.upper()
+    with Session(engine) as session:
+        clubs = load_clubs(session)
+        if a not in clubs or b not in clubs:
+            raise HTTPException(404, "unknown club")
+        games = session.execute(
+            select(Game)
+            .where(
+                Game.played,
+                ((Game.local_club_code == a) & (Game.road_club_code == b))
+                | ((Game.local_club_code == b) & (Game.road_club_code == a)),
+            )
+            .order_by(Game.utc_date.desc())
+        ).scalars().all()
+
+        wins = {a: 0, b: 0}
+        rs = {a: 0, b: 0}
+        po = {a: 0, b: 0}
+        pts = {a: 0, b: 0}
+        biggest = {a: None, b: None}
+        meetings = []
+        for gm in games:
+            if gm.local_score is None or gm.road_score is None:
+                continue
+            a_home = gm.local_club_code == a
+            a_score = gm.local_score if a_home else gm.road_score
+            b_score = gm.road_score if a_home else gm.local_score
+            winner = a if a_score > b_score else b
+            wins[winner] += 1
+            (po if gm.phase_type in ("PO", "FF", "PI") else rs)[winner] += 1
+            pts[a] += a_score
+            pts[b] += b_score
+            margin = abs(a_score - b_score)
+            if biggest[winner] is None or margin > biggest[winner]["margin"]:
+                biggest[winner] = {
+                    "margin": margin, "seasonLabel": season_label(gm.season_code)
+                }
+            meetings.append({
+                "season": gm.season_code,
+                "seasonLabel": season_label(gm.season_code),
+                "gameCode": gm.game_code,
+                "stage": meeting_stage(gm),
+                "homeCode": gm.local_club_code,
+                "homeScore": gm.local_score,
+                "awayCode": gm.road_club_code,
+                "awayScore": gm.road_score,
+                "winner": winner,
+            })
+
+        n = len(meetings)
+
+        def mini(code):
+            c = clubs[code]
+            return {"code": c.code, "name": c.name, "crestUrl": c.crest_url,
+                    "abbreviatedName": c.abbreviated_name}
+
+        return {
+            "clubA": mini(a),
+            "clubB": mini(b),
+            "total": n,
+            "record": {"a": wins[a], "b": wins[b]},
+            "regularSeason": {"a": rs[a], "b": rs[b]},
+            "playoffs": {"a": po[a], "b": po[b]},
+            "avgPoints": {
+                "a": round(pts[a] / n, 1) if n else None,
+                "b": round(pts[b] / n, 1) if n else None,
+            },
+            "biggestWin": {"a": biggest[a], "b": biggest[b]},
+            "meetings": meetings,
+        }
+
+
 @app.get("/api/champions")
 def champions() -> dict:
     """Finals history: champion, runner-up, score, F4 MVP per season,

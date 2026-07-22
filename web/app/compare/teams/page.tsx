@@ -1,11 +1,11 @@
 export const metadata = { title: "Compare teams" };
 
 import Link from "next/link";
-import GameCard from "@/components/GameCard";
+import HeadToHead from "@/components/HeadToHead";
 import ShotChart from "@/components/ShotChart";
 import TeamPicker from "@/components/TeamPicker";
 import ZoneChart from "@/components/ZoneChart";
-import { getClub, getClubShots } from "@/lib/api";
+import { getClub, getClubShots, getHeadToHead } from "@/lib/api";
 import { currentSeason } from "@/lib/season";
 
 type ClubBundle = Awaited<ReturnType<typeof getClub>>;
@@ -82,21 +82,13 @@ export default async function CompareTeamsPage({
   const { a, b } = await searchParams;
   const season = await currentSeason();
   const safe = <T,>(p: Promise<T>) => p.catch(() => null);
-  const [ta, tb, sa, sb] = await Promise.all([
+  const [ta, tb, sa, sb, h2h] = await Promise.all([
     a ? safe(getClub(a.toUpperCase(), season)) : null,
     b ? safe(getClub(b.toUpperCase(), season)) : null,
     a ? safe(getClubShots(a.toUpperCase(), season)) : null,
     b ? safe(getClubShots(b.toUpperCase(), season)) : null,
+    a && b ? safe(getHeadToHead(a.toUpperCase(), b.toUpperCase())) : null,
   ]);
-
-  const meetings =
-    ta && tb
-      ? ta.games.filter(
-          (g) =>
-            g.played &&
-            (g.home.code === tb.club.code || g.away.code === tb.club.code),
-        )
-      : [];
 
   const qa = ta?.stats?.quarters ?? [];
   const qb = tb?.stats?.quarters ?? [];
@@ -153,15 +145,15 @@ export default async function CompareTeamsPage({
             ))}
           </div>
 
-          {meetings.length > 0 && (
-            <>
-              <h2 className="mb-3 text-lg font-semibold">Meetings this season</h2>
-              <div className="mb-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {meetings.map((g) => (
-                  <GameCard key={g.id} game={g} />
-                ))}
+          {h2h && h2h.total > 0 && (
+            <div className="mb-8">
+              <h2 className="mb-3 text-lg font-semibold">
+                All-time head-to-head
+              </h2>
+              <div className="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4">
+                <HeadToHead h2h={h2h} variant="full" />
               </div>
-            </>
+            </div>
           )}
 
           <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">

@@ -494,6 +494,37 @@ export function getAllTimeLeaders() {
   }>(`/api/leaderboards/alltime`);
 }
 
+export type H2HMeeting = {
+  season: string;
+  seasonLabel: string;
+  gameCode: number;
+  stage: string;
+  homeCode: string;
+  homeScore: number;
+  awayCode: string;
+  awayScore: number;
+  winner: string;
+};
+
+export type HeadToHead = {
+  clubA: { code: string; name: string; crestUrl: string | null; abbreviatedName: string | null };
+  clubB: { code: string; name: string; crestUrl: string | null; abbreviatedName: string | null };
+  total: number;
+  record: { a: number; b: number };
+  regularSeason: { a: number; b: number };
+  playoffs: { a: number; b: number };
+  avgPoints: { a: number | null; b: number | null };
+  biggestWin: {
+    a: { margin: number; seasonLabel: string } | null;
+    b: { margin: number; seasonLabel: string } | null;
+  };
+  meetings: H2HMeeting[];
+};
+
+export function getHeadToHead(a: string, b: string) {
+  return get<HeadToHead>(`/api/head-to-head?a=${a}&b=${b}`);
+}
+
 export type ChampionClub = {
   code: string;
   name: string;
