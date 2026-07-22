@@ -35,7 +35,9 @@ const navLinks = [
   { href: "/teams", label: "Teams" },
   { href: "/players", label: "Players" },
   { href: "/highs", label: "Highs" },
+  { href: "/all-time", label: "All-time" },
   { href: "/notable", label: "Notable" },
+  { href: "/honor", label: "Honor" },
   { href: "/compare", label: "Compare" },
 ];
 
@@ -57,16 +59,16 @@ export default async function RootLayout({
     >
       <body className="min-h-full flex flex-col bg-neutral-950 text-neutral-100 font-sans">
         <header className="border-b border-neutral-800 bg-neutral-900/80 sticky top-0 z-10 backdrop-blur">
-          <div className="mx-auto flex max-w-5xl items-center gap-6 px-4 py-3">
+          <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3">
             <Link
               href="/"
-              className="flex items-center gap-2 text-lg font-bold tracking-tight"
+              className="flex shrink-0 items-center gap-2 text-lg font-bold tracking-tight"
             >
               <Logo size={30} />
               Eurostepper
             </Link>
             <MobileNav links={navLinks} />
-            <nav className="hidden gap-4 text-sm text-neutral-300 md:flex">
+            <nav className="hidden gap-3 text-sm text-neutral-300 lg:flex">
               {navLinks.map((l) => (
                 <Link
                   key={l.href}
@@ -83,7 +85,7 @@ export default async function RootLayout({
             </div>
           </div>
         </header>
-        <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">
+        <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6">
           {children}
         </main>
         <footer className="border-t border-neutral-800 py-4 text-center text-xs text-neutral-600">

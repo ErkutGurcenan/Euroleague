@@ -121,6 +121,253 @@ def seasons() -> dict:
         }
 
 
+AWARD_ORDER = ["MVP", "Final Four MVP", "Rising Star", "Best Defender"]
+
+
+@app.get("/api/honor")
+def honor_roll() -> dict:
+    """Season-by-season roll of honor: champion + individual awards."""
+    with Session(engine) as session:
+        clubs = load_clubs(session)
+        season_codes = sorted(
+            session.execute(select(Game.season_code).distinct()).scalars(),
+            reverse=True,
+        )
+        # champions from each season's Final Four championship game
+        champions: dict[str, dict] = {}
+        for gm in session.execute(
+            select(Game).where(
+                Game.phase_type == "FF", Game.played
+            )
+        ).scalars():
+            name = (gm.group_name or "").upper()
+            if "CHAMPIONSHIP" not in name:
+                continue
+            if gm.local_score is None or gm.road_score is None:
+                continue
+            win = gm.local_club_code if gm.local_score > gm.road_score else gm.road_club_code
+            club = clubs.get(win)
+            if club:
+                champions[gm.season_code] = {
+                    "code": club.code,
+                    "name": club.name,
+                    "crestUrl": club.crest_url,
+                }
+        # all awards, with player names resolved from box scores
+        award_rows = session.execute(select(Award)).scalars().all()
+        names = {
+            code: name
+            for code, name in session.execute(
+                select(PlayerGameStat.player_code, func.max(PlayerGameStat.player_name))
+                .group_by(PlayerGameStat.player_code)
+            )
+        }
+        images = {
+            code: url
+            for code, url in session.execute(
+                select(PersonStint.person_code, func.max(PersonStint.image_url))
+                .where(PersonStint.type == "J")
+                .group_by(PersonStint.person_code)
+            )
+        }
+        by_season: dict[str, dict] = {}
+        for a in award_rows:
+            club = clubs.get(a.club_code)
+            by_season.setdefault(a.season_code, {})[a.award] = {
+                "playerCode": a.player_code,
+                "name": names.get(a.player_code),
+                "imageUrl": images.get(a.player_code),
+                "clubCode": a.club_code,
+                "clubCrest": club.crest_url if club else None,
+            }
+
+        return {
+            "awardTypes": AWARD_ORDER,
+            "seasons": [
+                {
+                    "season": sc,
+                    "seasonLabel": season_label(sc),
+                    "canceled": sc in CANCELED_SEASONS,
+                    "note": CANCELED_SEASONS.get(sc),
+                    "champion": champions.get(sc),
+                    "awards": {
+                        t: by_season.get(sc, {}).get(t) for t in AWARD_ORDER
+                    },
+                }
+                for sc in season_codes
+            ],
+        }
+
+
+def meeting_stage(gm: Game) -> str:
+    if gm.phase_type == "FF":
+        name = (gm.group_name or "").upper()
+        if "CHAMPIONSHIP" in name:
+            return "Final"
+        if "THIRD" in name:
+            return "3rd place"
+        return "Semifinal"
+    if gm.phase_type == "PO":
+        return "Playoffs"
+    if gm.phase_type == "PI":
+        return "Play-in"
+    return gm.round_name or "Regular season"
+
+
+@app.get("/api/head-to-head")
+def head_to_head(a: str, b: str) -> dict:
+    """All-time series between two clubs across every season."""
+    a, b = a.upper(), b.upper()
+    with Session(engine) as session:
+        clubs = load_clubs(session)
+        if a not in clubs or b not in clubs:
+            raise HTTPException(404, "unknown club")
+        games = session.execute(
+            select(Game)
+            .where(
+                Game.played,
+                ((Game.local_club_code == a) & (Game.road_club_code == b))
+                | ((Game.local_club_code == b) & (Game.road_club_code == a)),
+            )
+            .order_by(Game.utc_date.desc())
+        ).scalars().all()
+
+        wins = {a: 0, b: 0}
+        rs = {a: 0, b: 0}
+        po = {a: 0, b: 0}
+        pts = {a: 0, b: 0}
+        biggest = {a: None, b: None}
+        meetings = []
+        for gm in games:
+            if gm.local_score is None or gm.road_score is None:
+                continue
+            a_home = gm.local_club_code == a
+            a_score = gm.local_score if a_home else gm.road_score
+            b_score = gm.road_score if a_home else gm.local_score
+            winner = a if a_score > b_score else b
+            wins[winner] += 1
+            (po if gm.phase_type in ("PO", "FF", "PI") else rs)[winner] += 1
+            pts[a] += a_score
+            pts[b] += b_score
+            margin = abs(a_score - b_score)
+            if biggest[winner] is None or margin > biggest[winner]["margin"]:
+                biggest[winner] = {
+                    "margin": margin, "seasonLabel": season_label(gm.season_code)
+                }
+            meetings.append({
+                "season": gm.season_code,
+                "seasonLabel": season_label(gm.season_code),
+                "gameCode": gm.game_code,
+                "stage": meeting_stage(gm),
+                "homeCode": gm.local_club_code,
+                "homeScore": gm.local_score,
+                "awayCode": gm.road_club_code,
+                "awayScore": gm.road_score,
+                "winner": winner,
+            })
+
+        n = len(meetings)
+
+        def mini(code):
+            c = clubs[code]
+            return {"code": c.code, "name": c.name, "crestUrl": c.crest_url,
+                    "abbreviatedName": c.abbreviated_name}
+
+        return {
+            "clubA": mini(a),
+            "clubB": mini(b),
+            "total": n,
+            "record": {"a": wins[a], "b": wins[b]},
+            "regularSeason": {"a": rs[a], "b": rs[b]},
+            "playoffs": {"a": po[a], "b": po[b]},
+            "avgPoints": {
+                "a": round(pts[a] / n, 1) if n else None,
+                "b": round(pts[b] / n, 1) if n else None,
+            },
+            "biggestWin": {"a": biggest[a], "b": biggest[b]},
+            "meetings": meetings,
+        }
+
+
+@app.get("/api/champions")
+def champions() -> dict:
+    """Finals history: champion, runner-up, score, F4 MVP per season,
+    plus a titles-by-club tally."""
+    with Session(engine) as session:
+        clubs = load_clubs(session)
+        season_codes = sorted(
+            session.execute(select(Game.season_code).distinct()).scalars(),
+            reverse=True,
+        )
+        f4_mvp = {
+            a.season_code: a.player_code
+            for a in session.execute(
+                select(Award).where(Award.award == "Final Four MVP")
+            ).scalars()
+        }
+        names = {
+            code: name
+            for code, name in session.execute(
+                select(PlayerGameStat.player_code, func.max(PlayerGameStat.player_name))
+                .where(PlayerGameStat.player_code.in_(list(f4_mvp.values())))
+                .group_by(PlayerGameStat.player_code)
+            )
+        }
+
+        def club_mini(code):
+            c = clubs.get(code)
+            return {"code": c.code, "name": c.name, "crestUrl": c.crest_url} if c else None
+
+        finals = []
+        titles: dict[str, int] = {}
+        for gm in session.execute(
+            select(Game).where(Game.phase_type == "FF", Game.played)
+        ).scalars():
+            if "CHAMPIONSHIP" not in (gm.group_name or "").upper():
+                continue
+            if gm.local_score is None or gm.road_score is None:
+                continue
+            home_won = gm.local_score > gm.road_score
+            champ = gm.local_club_code if home_won else gm.road_club_code
+            runner = gm.road_club_code if home_won else gm.local_club_code
+            cs = max(gm.local_score, gm.road_score)
+            rs = min(gm.local_score, gm.road_score)
+            titles[champ] = titles.get(champ, 0) + 1
+            mvp_code = f4_mvp.get(gm.season_code)
+            finals.append({
+                "season": gm.season_code,
+                "seasonLabel": season_label(gm.season_code),
+                "gameCode": gm.game_code,
+                "champion": club_mini(champ),
+                "runnerUp": club_mini(runner),
+                "championScore": cs,
+                "runnerUpScore": rs,
+                "finalFourMvp": (
+                    {"playerCode": mvp_code, "name": names.get(mvp_code)}
+                    if mvp_code else None
+                ),
+            })
+        finals.sort(key=lambda f: f["season"], reverse=True)
+
+        titles_by_club = sorted(
+            (
+                {**club_mini(code), "titles": n}
+                for code, n in titles.items() if clubs.get(code)
+            ),
+            key=lambda t: (-t["titles"], t["name"]),
+        )
+        canceled = [
+            {"season": sc, "seasonLabel": season_label(sc),
+             "note": CANCELED_SEASONS[sc]}
+            for sc in season_codes if sc in CANCELED_SEASONS
+        ]
+        return {
+            "titlesByClub": titles_by_club,
+            "finals": finals,
+            "canceled": canceled,
+        }
+
+
 @app.get("/api/awards")
 def awards(season: str = DEFAULT_SEASON) -> dict:
     with Session(engine) as session:
@@ -605,7 +852,22 @@ def clubs_index(season: str = DEFAULT_SEASON) -> dict:
                 )
             ).scalars()
         }
-        rows = session.execute(select(Club).order_by(Club.name)).scalars()
+        # clubs that actually participated in this season (appeared in a game)
+        participants = set(
+            session.execute(
+                select(Game.local_club_code).where(Game.season_code == season)
+            ).scalars()
+        ) | set(
+            session.execute(
+                select(Game.road_club_code).where(Game.season_code == season)
+            ).scalars()
+        )
+        participants.discard(None)
+        rows = session.execute(
+            select(Club)
+            .where(Club.code.in_(participants))
+            .order_by(Club.name)
+        ).scalars()
         clubs = []
         for c in rows:
             st = table.get(c.code)
@@ -727,6 +989,91 @@ def players_index(
         return {"season": season, "minGames": threshold, "players": players}
 
 
+
+
+@app.get("/api/leaderboards/alltime")
+def alltime_leaderboards(limit: int = 10, min_games: int = 50) -> dict:
+    """Career leaders across all seasons — totals and per-game rates."""
+    g = PlayerGameStat
+    with Session(engine) as session:
+        rows = session.execute(
+            select(
+                g.player_code,
+                func.max(g.player_name),
+                func.count().label("gp"),
+                func.count(func.distinct(g.season_code)).label("seasons"),
+                func.sum(g.points), func.sum(g.treb), func.sum(g.ast),
+                func.sum(g.stl), func.sum(g.blk), func.sum(g.fg3m),
+                func.sum(g.pir),
+            ).group_by(g.player_code)
+        ).all()
+        images = {
+            code: url
+            for code, url in session.execute(
+                select(PersonStint.person_code, func.max(PersonStint.image_url))
+                .where(PersonStint.type == "J")
+                .group_by(PersonStint.person_code)
+            )
+        }
+        last_club: dict[str, str] = {}
+        for pc, cc in session.execute(
+            select(g.player_code, g.club_code).order_by(g.season_code, g.game_code)
+        ):
+            last_club[pc] = cc
+        clubs = load_clubs(session)
+
+        players = []
+        for (code, name, gp, seasons, pts, treb, ast,
+             stl, blk, fg3m, pir) in rows:
+            club = clubs.get(last_club.get(code, ""))
+            players.append({
+                "playerCode": code, "name": name,
+                "imageUrl": images.get(code),
+                "clubCode": club.code if club else None,
+                "clubCrest": club.crest_url if club else None,
+                "seasonsPlayed": seasons, "games": gp,
+                "points": pts or 0, "rebounds": treb or 0, "assists": ast or 0,
+                "steals": stl or 0, "blocks": blk or 0, "threes": fg3m or 0,
+                "pir": pir or 0,
+                "ppg": round((pts or 0) / gp, 1),
+                "rpg": round((treb or 0) / gp, 1),
+                "apg": round((ast or 0) / gp, 1),
+                "pirpg": round((pir or 0) / gp, 1),
+            })
+
+        def top(key: str, label: str, unit: str, rate: bool) -> dict:
+            pool = [p for p in players if not rate or p["games"] >= min_games]
+            ranked = sorted(pool, key=lambda p: -p[key])[:limit]
+            return {
+                "key": key, "label": label, "unit": unit, "rate": rate,
+                "entries": [
+                    {**{k: p[k] for k in
+                        ("playerCode", "name", "imageUrl", "clubCode",
+                         "clubCrest", "seasonsPlayed", "games")},
+                     "value": p[key]}
+                    for p in ranked
+                ],
+            }
+
+        return {
+            "minGames": min_games,
+            "totals": [
+                top("points", "Points", "pts", False),
+                top("rebounds", "Rebounds", "reb", False),
+                top("assists", "Assists", "ast", False),
+                top("steals", "Steals", "stl", False),
+                top("blocks", "Blocks", "blk", False),
+                top("threes", "Three-pointers", "3PM", False),
+                top("games", "Games played", "g", False),
+                top("pir", "Total PIR", "pir", False),
+            ],
+            "averages": [
+                top("ppg", "Points per game", "ppg", True),
+                top("rpg", "Rebounds per game", "rpg", True),
+                top("apg", "Assists per game", "apg", True),
+                top("pirpg", "PIR per game", "pir", True),
+            ],
+        }
 
 
 HIGH_CATEGORIES = [
@@ -876,6 +1223,116 @@ def transfers(season: str = DEFAULT_SEASON) -> dict:
         return {"season": season, "transfers": moves}
 
 
+@app.get("/api/players/{player_code}/career")
+def player_career(player_code: str) -> dict:
+    """A player's stats across every season in the database."""
+    g = PlayerGameStat
+    with Session(engine) as session:
+        rows = session.execute(
+            select(
+                g.season_code,
+                func.count().label("gp"),
+                func.sum(g.seconds_played),
+                func.sum(g.points),
+                func.sum(g.fg2m), func.sum(g.fg2a),
+                func.sum(g.fg3m), func.sum(g.fg3a),
+                func.sum(g.ftm), func.sum(g.fta),
+                func.sum(g.treb), func.sum(g.ast), func.sum(g.pir),
+            )
+            .where(g.player_code == player_code)
+            .group_by(g.season_code)
+            .order_by(g.season_code)
+        ).all()
+        if not rows:
+            raise HTTPException(404, f"no games for player {player_code}")
+
+        clubs = load_clubs(session)
+        # primary club per season = most games that season
+        season_club: dict[str, str] = {}
+        for season_code, club_code, _ in session.execute(
+            select(g.season_code, g.club_code, func.count().label("n"))
+            .where(g.player_code == player_code)
+            .group_by(g.season_code, g.club_code)
+            .order_by(g.season_code, func.count().desc())
+        ):
+            season_club.setdefault(season_code, club_code)
+
+        identity = session.execute(
+            select(
+                func.max(PersonStint.name),
+                func.max(PersonStint.position_name),
+                func.max(PersonStint.image_url),
+            ).where(PersonStint.person_code == player_code, PersonStint.type == "J")
+        ).one()
+        name_fallback = rows[-1][0]  # season code, replaced below if we have a name
+
+        awards = [
+            {
+                "season": a.season_code,
+                "seasonLabel": season_label(a.season_code),
+                "award": a.award,
+            }
+            for a in session.execute(
+                select(Award)
+                .where(Award.player_code == player_code)
+                .order_by(Award.season_code)
+            ).scalars()
+        ]
+
+        seasons = []
+        tot = {k: 0 for k in
+               ("gp", "secs", "pts", "fg2m", "fg2a", "fg3m", "fg3a",
+                "ftm", "fta", "treb", "ast", "pir")}
+        for (sc, gp, secs, pts, fg2m, fg2a, fg3m, fg3a,
+             ftm, fta, treb, ast, pir) in rows:
+            club = clubs.get(season_club.get(sc))
+            for k, v in zip(
+                ("gp", "secs", "pts", "fg2m", "fg2a", "fg3m", "fg3a",
+                 "ftm", "fta", "treb", "ast", "pir"),
+                (gp, secs, pts, fg2m, fg2a, fg3m, fg3a, ftm, fta, treb, ast, pir),
+            ):
+                tot[k] += v or 0
+            seasons.append({
+                "season": sc,
+                "seasonLabel": season_label(sc),
+                "clubCode": club.code if club else None,
+                "clubName": club.name if club else None,
+                "crestUrl": club.crest_url if club else None,
+                "gamesPlayed": gp,
+                "minutes": round((secs or 0) / 60.0 / gp, 1) if gp else None,
+                "points": round((pts or 0) / gp, 1) if gp else None,
+                "rebounds": round((treb or 0) / gp, 1) if gp else None,
+                "assists": round((ast or 0) / gp, 1) if gp else None,
+                "pir": round((pir or 0) / gp, 1) if gp else None,
+                "fg2Pct": pct(fg2m, fg2a),
+                "fg3Pct": pct(fg3m, fg3a),
+                "ftPct": pct(ftm, fta),
+            })
+
+        n = tot["gp"]
+        career = {
+            "gamesPlayed": n,
+            "minutes": round(tot["secs"] / 60.0 / n, 1) if n else None,
+            "points": round(tot["pts"] / n, 1) if n else None,
+            "rebounds": round(tot["treb"] / n, 1) if n else None,
+            "assists": round(tot["ast"] / n, 1) if n else None,
+            "pir": round(tot["pir"] / n, 1) if n else None,
+            "fg2Pct": pct(tot["fg2m"], tot["fg2a"]),
+            "fg3Pct": pct(tot["fg3m"], tot["fg3a"]),
+            "ftPct": pct(tot["ftm"], tot["fta"]),
+        }
+        return {
+            "playerCode": player_code,
+            "name": identity[0] or name_fallback,
+            "positionName": identity[1],
+            "imageUrl": identity[2],
+            "seasonsPlayed": len(seasons),
+            "awards": awards,
+            "seasons": seasons,
+            "career": career,
+        }
+
+
 @app.get("/api/players/{player_code}")
 def player_detail(player_code: str, season: str = DEFAULT_SEASON) -> dict:
     g = PlayerGameStat
@@ -958,6 +1415,8 @@ def player_detail(player_code: str, season: str = DEFAULT_SEASON) -> dict:
                 "points": round(sum(s.points or 0 for s in stats) / gp, 1),
                 "rebounds": round(sum(s.treb or 0 for s in stats) / gp, 1),
                 "assists": round(sum(s.ast or 0 for s in stats) / gp, 1),
+                "steals": round(sum(s.stl or 0 for s in stats) / gp, 1),
+                "blocks": round(sum(s.blk or 0 for s in stats) / gp, 1),
                 "pir": round(sum(s.pir or 0 for s in stats) / gp, 1),
                 "fg2Pct": pct(
                     sum(s.fg2m or 0 for s in stats), sum(s.fg2a or 0 for s in stats)
@@ -1110,6 +1569,96 @@ def club_season_stats(session, code: str, season: str) -> Optional[dict]:
         "fg3Pct": pct(fg3m, fg3a),
         "ftPct": pct(ftm, fta),
     }
+
+
+@app.get("/api/clubs/{code}/history")
+def club_history(code: str) -> dict:
+    """A club's season-by-season record across every season."""
+    with Session(engine) as session:
+        club = session.get(Club, code)
+        if club is None:
+            raise HTTPException(404, f"unknown club {code}")
+
+        # per season: which phases the club played, and championship outcome
+        phases: dict[str, set] = {}
+        champ_result: dict[str, str] = {}
+        for gm in session.execute(
+            select(Game).where(
+                Game.played,
+                (Game.local_club_code == code) | (Game.road_club_code == code),
+            )
+        ).scalars():
+            phases.setdefault(gm.season_code, set()).add(gm.phase_type)
+            if gm.phase_type == "FF" and "CHAMPIONSHIP" in (gm.group_name or "").upper():
+                if gm.local_score is not None and gm.road_score is not None:
+                    home = gm.local_club_code == code
+                    won = (gm.local_score > gm.road_score) == home
+                    champ_result[gm.season_code] = "champion" if won else "runner_up"
+
+        # final-round standings row per season (position + W-L)
+        standing: dict[str, StandingRow] = {}
+        for r in session.execute(
+            select(StandingRow)
+            .where(StandingRow.club_code == code)
+            .order_by(StandingRow.round)
+        ).scalars():
+            standing[r.season_code] = r  # last (max round) wins
+
+        def result_of(sc: str) -> str:
+            if sc in CANCELED_SEASONS:
+                return "canceled"
+            if sc in champ_result:
+                return champ_result[sc]
+            ph = phases.get(sc, set())
+            if "FF" in ph:
+                return "final_four"
+            if "PO" in ph:
+                return "playoffs"
+            if "PI" in ph:
+                return "play_in"
+            return "regular_season"
+
+        season_codes = sorted(phases.keys() | standing.keys(), reverse=True)
+        seasons = []
+        titles = final_fours = tot_w = tot_l = 0
+        best = None
+        for sc in season_codes:
+            st = standing.get(sc)
+            res = result_of(sc)
+            w = st.games_won if st else None
+            losses = st.games_lost if st else None
+            pos = st.position if st else None
+            if res == "champion":
+                titles += 1
+            if res in ("champion", "runner_up", "final_four"):
+                final_fours += 1
+            if w is not None:
+                tot_w += w
+                tot_l += losses or 0
+            if pos is not None and (best is None or pos < best):
+                best = pos
+            seasons.append({
+                "season": sc,
+                "seasonLabel": season_label(sc),
+                "wins": w,
+                "losses": losses,
+                "position": pos,
+                "result": res,
+            })
+
+        return {
+            "club": {"code": club.code, "name": club.name,
+                     "crestUrl": club.crest_url},
+            "summary": {
+                "seasons": len(seasons),
+                "titles": titles,
+                "finalFours": final_fours,
+                "bestFinish": best,
+                "wins": tot_w,
+                "losses": tot_l,
+            },
+            "seasons": seasons,
+        }
 
 
 @app.get("/api/clubs/{code}")

@@ -172,6 +172,8 @@ export type PlayerDetail = {
     points: number;
     rebounds: number;
     assists: number;
+    steals: number;
+    blocks: number;
     pir: number;
     fg2Pct: number | null;
     fg3Pct: number | null;
@@ -266,6 +268,38 @@ export function getPlayer(code: string, season?: string) {
   return get<PlayerDetail>(`/api/players/${code}${qs({ season })}`);
 }
 
+export type CareerSeason = {
+  season: string;
+  seasonLabel: string;
+  clubCode: string | null;
+  clubName: string | null;
+  crestUrl: string | null;
+  gamesPlayed: number;
+  minutes: number | null;
+  points: number | null;
+  rebounds: number | null;
+  assists: number | null;
+  pir: number | null;
+  fg2Pct: number | null;
+  fg3Pct: number | null;
+  ftPct: number | null;
+};
+
+export type PlayerCareer = {
+  playerCode: string;
+  name: string;
+  positionName: string | null;
+  imageUrl: string | null;
+  seasonsPlayed: number;
+  awards: { season: string; seasonLabel: string; award: string }[];
+  seasons: CareerSeason[];
+  career: Omit<CareerSeason, "season" | "seasonLabel" | "clubCode" | "clubName" | "crestUrl">;
+};
+
+export function getPlayerCareer(code: string) {
+  return get<PlayerCareer>(`/api/players/${code}/career`);
+}
+
 export function getPlayerShots(code: string, season?: string) {
   return get<{ season: string; total: number; shots: ShotPoint[] }>(
     `/api/players/${code}/shots${qs({ season })}`,
@@ -310,6 +344,39 @@ export type CoachEntry = {
   role: string;
   active: boolean | null;
 };
+
+export type ClubHistorySeason = {
+  season: string;
+  seasonLabel: string;
+  wins: number | null;
+  losses: number | null;
+  position: number | null;
+  result:
+    | "champion"
+    | "runner_up"
+    | "final_four"
+    | "playoffs"
+    | "play_in"
+    | "regular_season"
+    | "canceled";
+};
+
+export type ClubHistory = {
+  club: { code: string; name: string; crestUrl: string | null };
+  summary: {
+    seasons: number;
+    titles: number;
+    finalFours: number;
+    bestFinish: number | null;
+    wins: number;
+    losses: number;
+  };
+  seasons: ClubHistorySeason[];
+};
+
+export function getClubHistory(code: string) {
+  return get<ClubHistory>(`/api/clubs/${code}/history`);
+}
 
 export function getClub(code: string, season?: string) {
   return get<{
@@ -398,6 +465,111 @@ export function getAwards(season?: string) {
   return get<{ season: string; awards: AwardEntry[] }>(
     `/api/awards${qs({ season })}`,
   );
+}
+
+export type AllTimeEntry = {
+  playerCode: string;
+  name: string | null;
+  imageUrl: string | null;
+  clubCode: string | null;
+  clubCrest: string | null;
+  seasonsPlayed: number;
+  games: number;
+  value: number;
+};
+
+export type AllTimeCategory = {
+  key: string;
+  label: string;
+  unit: string;
+  rate: boolean;
+  entries: AllTimeEntry[];
+};
+
+export function getAllTimeLeaders() {
+  return get<{
+    minGames: number;
+    totals: AllTimeCategory[];
+    averages: AllTimeCategory[];
+  }>(`/api/leaderboards/alltime`);
+}
+
+export type H2HMeeting = {
+  season: string;
+  seasonLabel: string;
+  gameCode: number;
+  stage: string;
+  homeCode: string;
+  homeScore: number;
+  awayCode: string;
+  awayScore: number;
+  winner: string;
+};
+
+export type HeadToHead = {
+  clubA: { code: string; name: string; crestUrl: string | null; abbreviatedName: string | null };
+  clubB: { code: string; name: string; crestUrl: string | null; abbreviatedName: string | null };
+  total: number;
+  record: { a: number; b: number };
+  regularSeason: { a: number; b: number };
+  playoffs: { a: number; b: number };
+  avgPoints: { a: number | null; b: number | null };
+  biggestWin: {
+    a: { margin: number; seasonLabel: string } | null;
+    b: { margin: number; seasonLabel: string } | null;
+  };
+  meetings: H2HMeeting[];
+};
+
+export function getHeadToHead(a: string, b: string) {
+  return get<HeadToHead>(`/api/head-to-head?a=${a}&b=${b}`);
+}
+
+export type ChampionClub = {
+  code: string;
+  name: string;
+  crestUrl: string | null;
+  titles: number;
+};
+
+export type FinalEntry = {
+  season: string;
+  seasonLabel: string;
+  gameCode: number;
+  champion: { code: string; name: string; crestUrl: string | null };
+  runnerUp: { code: string; name: string; crestUrl: string | null };
+  championScore: number;
+  runnerUpScore: number;
+  finalFourMvp: { playerCode: string; name: string | null } | null;
+};
+
+export function getChampions() {
+  return get<{
+    titlesByClub: ChampionClub[];
+    finals: FinalEntry[];
+    canceled: { season: string; seasonLabel: string; note: string }[];
+  }>(`/api/champions`);
+}
+
+export type HonorAward = {
+  playerCode: string;
+  name: string | null;
+  imageUrl: string | null;
+  clubCode: string | null;
+  clubCrest: string | null;
+} | null;
+
+export type HonorSeason = {
+  season: string;
+  seasonLabel: string;
+  canceled: boolean;
+  note: string | null;
+  champion: { code: string; name: string; crestUrl: string | null } | null;
+  awards: Record<string, HonorAward>;
+};
+
+export function getHonorRoll() {
+  return get<{ awardTypes: string[]; seasons: HonorSeason[] }>(`/api/honor`);
 }
 
 export type SearchResults = {

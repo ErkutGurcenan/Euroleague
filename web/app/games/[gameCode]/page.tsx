@@ -1,35 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import GameCard from "@/components/GameCard";
+import HeadToHead from "@/components/HeadToHead";
 import ShotChart from "@/components/ShotChart";
-import { getGame, type GameDetail, type GameDetailSide } from "@/lib/api";
+import { getGame, getHeadToHead, type GameDetailSide } from "@/lib/api";
 import { currentSeason } from "@/lib/season";
-
-function seriesTally(game: GameDetail): string | null {
-  const codeA = game.home.club?.code;
-  const codeB = game.away.club?.code;
-  if (!codeA || !codeB) return null;
-  const wins: Record<string, number> = { [codeA]: 0, [codeB]: 0 };
-  const all = [
-    ...game.headToHead,
-    {
-      played: game.played,
-      home: { code: codeA, score: game.home.score },
-      away: { code: codeB, score: game.away.score },
-    },
-  ];
-  for (const g of all) {
-    if (!g.played || g.home.score == null || g.away.score == null) continue;
-    const winner = g.home.score > g.away.score ? g.home.code : g.away.code;
-    if (winner && winner in wins) wins[winner] += 1;
-  }
-  if (wins[codeA] === wins[codeB]) return `Season series tied ${wins[codeA]}–${wins[codeB]}`;
-  const leader = wins[codeA] > wins[codeB] ? codeA : codeB;
-  const club = leader === codeA ? game.home.club : game.away.club;
-  return `${club?.abbreviatedName ?? leader} leads season series ${Math.max(
-    wins[codeA], wins[codeB],
-  )}–${Math.min(wins[codeA], wins[codeB])}`;
-}
 
 function BoxScoreTable({ side }: { side: GameDetailSide }) {
   const t = side.totals;
@@ -184,6 +158,10 @@ export default async function GamePage({
     notFound();
   }
   const { home, away } = game;
+  const h2h =
+    home.club && away.club
+      ? await getHeadToHead(home.club.code, away.club.code).catch(() => null)
+      : null;
   const date = game.utcDate
     ? new Date(game.utcDate).toLocaleString("en-GB", {
         weekday: "short",
@@ -354,16 +332,11 @@ export default async function GamePage({
         </>
       )}
 
-      {game.headToHead.length > 0 && (
+      {h2h && h2h.total > 1 && (
         <>
-          <div className="mb-3 flex items-baseline justify-between">
-            <h2 className="text-lg font-semibold">Head-to-head</h2>
-            <span className="text-sm text-neutral-400">{seriesTally(game)}</span>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {game.headToHead.map((g) => (
-              <GameCard key={g.id} game={g} />
-            ))}
+          <h2 className="mb-3 text-lg font-semibold">Head-to-head</h2>
+          <div className="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4">
+            <HeadToHead h2h={h2h} limit={5} wide />
           </div>
         </>
       )}

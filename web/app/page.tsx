@@ -6,6 +6,7 @@ import {
   getGames,
   getHighs,
   getPlayers,
+  getSeasons,
   getStandings,
   type PlayerSummary,
 } from "@/lib/api";
@@ -47,14 +48,18 @@ function LeaderRow({
 
 export default async function HomePage() {
   const season = await currentSeason();
-  const [standings, players, highs, games, awards] = await Promise.all([
-    getStandings(undefined, season),
-    getPlayers(season),
-    getHighs(season),
-    getGames(season),
-    getAwards(season),
-  ]);
+  const [standings, players, highs, games, awards, seasonList] =
+    await Promise.all([
+      getStandings(undefined, season),
+      getPlayers(season),
+      getHighs(season),
+      getGames(season),
+      getAwards(season),
+      getSeasons().catch(() => null),
+    ]);
   const label = seasonLabel(games.season);
+  const seasonNote =
+    seasonList?.seasons.find((s) => s.code === games.season)?.note ?? null;
 
   const ffGames = games.games.filter((g) => g.phaseType === "FF");
   const final = ffGames.find((g) =>
@@ -94,6 +99,21 @@ export default async function HomePage() {
 
   return (
     <div>
+      {/* canceled-season banner (shown when there is no champion) */}
+      {!champion && seasonNote && (
+        <div className="mb-6 flex items-center gap-4 rounded-xl border border-neutral-700 bg-neutral-900/60 p-4">
+          <span className="text-3xl" aria-hidden="true">
+            ⚠
+          </span>
+          <div>
+            <div className="text-xs uppercase tracking-wide text-neutral-400">
+              {label} EuroLeague
+            </div>
+            <div className="text-lg font-bold">{seasonNote}</div>
+          </div>
+        </div>
+      )}
+
       {/* champion hero */}
       {final && champion && (
         <Link

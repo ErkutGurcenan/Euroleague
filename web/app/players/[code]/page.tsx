@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import GameLogChart from "@/components/GameLogChart";
+import PlayerViewToggle from "@/components/PlayerViewToggle";
 import ShotChartExplorer from "@/components/ShotChartExplorer";
 import { getPlayer, getPlayerShots } from "@/lib/api";
 import { currentSeason } from "@/lib/season";
@@ -57,7 +58,7 @@ export default async function PlayerPage({
             className="h-20 w-20 rounded-full border border-neutral-800 object-cover"
           />
         )}
-        <div>
+        <div className="min-w-0 flex-1">
           <h1 className="text-2xl font-bold">
             {player.dorsal && (
               <span className="mr-2 text-neutral-500">#{player.dorsal}</span>
@@ -78,14 +79,17 @@ export default async function PlayerPage({
             {player.country && ` · ${player.country}`}
           </p>
         </div>
+        <PlayerViewToggle code={code} active="season" />
       </div>
 
-      <div className="mb-8 grid grid-cols-3 gap-3 sm:grid-cols-6">
+      <div className="mb-8 grid grid-cols-4 gap-3 sm:grid-cols-8">
         <StatCard label="Games" value={a.gamesPlayed} />
         <StatCard label="Min" value={a.minutes} />
         <StatCard label="Pts" value={a.points} />
         <StatCard label="Reb" value={a.rebounds} />
         <StatCard label="Ast" value={a.assists} />
+        <StatCard label="Stl" value={a.steals} />
+        <StatCard label="Blk" value={a.blocks} />
         <StatCard label="PIR" value={a.pir} />
       </div>
 
@@ -137,6 +141,8 @@ export default async function PlayerPage({
               <th className="px-2 py-2 text-right">Pts</th>
               <th className="px-2 py-2 text-right">Reb</th>
               <th className="px-2 py-2 text-right">Ast</th>
+              <th className="px-2 py-2 text-right">Stl</th>
+              <th className="px-2 py-2 text-right">Blk</th>
               <th className="px-2 py-2 text-right">2P</th>
               <th className="px-2 py-2 text-right">3P</th>
               <th className="px-2 py-2 text-right">FT</th>
@@ -168,6 +174,8 @@ export default async function PlayerPage({
                 </td>
                 <td className="px-2 py-2 text-right tabular-nums">{g.rebounds}</td>
                 <td className="px-2 py-2 text-right tabular-nums">{g.assists}</td>
+                <td className="px-2 py-2 text-right tabular-nums">{g.steals}</td>
+                <td className="px-2 py-2 text-right tabular-nums">{g.blocks}</td>
                 <td className="px-2 py-2 text-right tabular-nums">
                   {g.fg2}
                 </td>

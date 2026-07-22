@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import FranchiseHistory from "@/components/FranchiseHistory";
 import GameCard from "@/components/GameCard";
 import ShotChartExplorer from "@/components/ShotChartExplorer";
-import { getClub, getClubShots } from "@/lib/api";
+import { getClub, getClubHistory, getClubShots } from "@/lib/api";
 import { currentSeason } from "@/lib/season";
 
 function age(birthDate: string | null): string {
@@ -36,11 +37,12 @@ export default async function TeamPage({
 }) {
   const { code } = await params;
   const season = await currentSeason();
-  let data, shotData;
+  let data, shotData, history;
   try {
-    [data, shotData] = await Promise.all([
+    [data, shotData, history] = await Promise.all([
       getClub(code.toUpperCase(), season),
       getClubShots(code.toUpperCase(), season),
+      getClubHistory(code.toUpperCase()).catch(() => null),
     ]);
   } catch {
     notFound();
@@ -242,6 +244,12 @@ export default async function TeamPage({
             ))}
           </div>
         </>
+      )}
+
+      {history && history.seasons.length > 0 && (
+        <div className="mb-8">
+          <FranchiseHistory data={history} />
+        </div>
       )}
 
       <h2 className="mb-3 text-lg font-semibold">Results</h2>
