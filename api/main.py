@@ -19,6 +19,7 @@ from euroleague_pipeline.models import (  # noqa: E402
     Award,
     Club,
     Game,
+    GameReferee,
     PbpEvent,
     PersonStint,
     PlayerGameStat,
@@ -287,6 +288,61 @@ def head_to_head(a: str, b: str) -> dict:
             "biggestWin": {"a": biggest[a], "b": biggest[b]},
             "meetings": meetings,
         }
+
+
+@app.get("/api/referees")
+def referees(season: str = DEFAULT_SEASON, min_games: int = 8) -> dict:
+    """Per-referee officiating profile for a season."""
+    with Session(engine) as session:
+        games = {
+            gm.game_code: gm
+            for gm in session.execute(
+                select(Game).where(Game.season_code == season, Game.played)
+            ).scalars()
+        }
+        fouls_by_game: dict[int, int] = {}
+        for gc, f in session.execute(
+            select(PlayerGameStat.game_code, func.sum(PlayerGameStat.fouls_committed))
+            .where(PlayerGameStat.season_code == season)
+            .group_by(PlayerGameStat.game_code)
+        ):
+            fouls_by_game[gc] = f or 0
+
+        refs: dict[str, dict] = {}
+        for r in session.execute(
+            select(GameReferee).where(GameReferee.season_code == season)
+        ).scalars():
+            gm = games.get(r.game_code)
+            if gm is None or gm.local_score is None or gm.road_score is None:
+                continue
+            d = refs.setdefault(
+                r.referee_code,
+                {"name": r.name, "country": r.country_code,
+                 "games": 0, "homeWins": 0, "points": 0, "fouls": 0, "foulGames": 0},
+            )
+            d["games"] += 1
+            if gm.local_score > gm.road_score:
+                d["homeWins"] += 1
+            d["points"] += gm.local_score + gm.road_score
+            if r.game_code in fouls_by_game:
+                d["fouls"] += fouls_by_game[r.game_code]
+                d["foulGames"] += 1
+
+        out = []
+        for code, d in refs.items():
+            if d["games"] < min_games:
+                continue
+            out.append({
+                "code": code,
+                "name": d["name"],
+                "country": d["country"],
+                "games": d["games"],
+                "homeWinPct": round(100 * d["homeWins"] / d["games"], 1),
+                "avgPoints": round(d["points"] / d["games"], 1),
+                "avgFouls": round(d["fouls"] / d["foulGames"], 1) if d["foulGames"] else None,
+            })
+        out.sort(key=lambda r: -r["games"])
+        return {"season": season, "minGames": min_games, "referees": out}
 
 
 @app.get("/api/champions")

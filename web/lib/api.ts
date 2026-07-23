@@ -546,6 +546,22 @@ export function getHeadToHead(a: string, b: string) {
   return get<HeadToHead>(`/api/head-to-head?a=${a}&b=${b}`);
 }
 
+export type RefereeEntry = {
+  code: string;
+  name: string | null;
+  country: string | null;
+  games: number;
+  homeWinPct: number;
+  avgPoints: number;
+  avgFouls: number | null;
+};
+
+export function getReferees(season?: string) {
+  return get<{ season: string; minGames: number; referees: RefereeEntry[] }>(
+    `/api/referees${qs({ season })}`,
+  );
+}
+
 export type ChampionClub = {
   code: string;
   name: string;

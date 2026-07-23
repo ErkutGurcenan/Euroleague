@@ -18,7 +18,7 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
 from .api import EuroleagueApi
-from .models import Base, Club, Game, PersonStint, StandingRow
+from .models import Base, Club, Game, GameReferee, PersonStint, StandingRow
 
 log = logging.getLogger("ingest")
 
@@ -118,6 +118,23 @@ def ingest_games(api: EuroleagueApi, session: Session, season: str) -> int:
                 "road_q4": rp.get("partials4"),
             },
         )
+        for slot in ("referee1", "referee2", "referee3"):
+            r = g.get(slot)
+            if not r or not r.get("code"):
+                continue
+            upsert(
+                session,
+                GameReferee,
+                {
+                    "season_code": season,
+                    "game_code": g.get("gameCode"),
+                    "referee_code": r["code"],
+                },
+                {
+                    "name": r.get("name"),
+                    "country_code": (r.get("country") or {}).get("code"),
+                },
+            )
         n += 1
     return n
 

@@ -83,6 +83,20 @@ class StandingRow(Base):
     qualified: Mapped[Optional[bool]] = mapped_column(Boolean)
 
 
+class GameReferee(Base):
+    """One referee's assignment to one game (up to 3 per game)."""
+
+    __tablename__ = "game_referees"
+    __table_args__ = (UniqueConstraint("season_code", "game_code", "referee_code"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    season_code: Mapped[str] = mapped_column(String(8), index=True)
+    game_code: Mapped[int] = mapped_column(Integer, index=True)
+    referee_code: Mapped[str] = mapped_column(String(16), index=True)
+    name: Mapped[Optional[str]] = mapped_column(String(120))
+    country_code: Mapped[Optional[str]] = mapped_column(String(8))
+
+
 class PlayerGameStat(Base):
     """One player's box-score line in one game (players who logged minutes)."""
 
