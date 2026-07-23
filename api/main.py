@@ -1076,6 +1076,93 @@ def alltime_leaderboards(limit: int = 10, min_games: int = 50) -> dict:
         }
 
 
+@app.get("/api/shooting")
+def shooting_leaders(season: str = DEFAULT_SEASON, limit: int = 10) -> dict:
+    """Shooting-efficiency leaders for a season (advanced + raw percentages)."""
+    g = PlayerGameStat
+    with Session(engine) as session:
+        rows = session.execute(
+            select(
+                g.player_code,
+                func.max(g.player_name),
+                func.sum(g.points),
+                func.sum(g.fg2m), func.sum(g.fg2a),
+                func.sum(g.fg3m), func.sum(g.fg3a),
+                func.sum(g.ftm), func.sum(g.fta),
+            ).where(g.season_code == season).group_by(g.player_code)
+        ).all()
+        images = {
+            code: url
+            for code, url in session.execute(
+                select(PersonStint.person_code, func.max(PersonStint.image_url))
+                .where(PersonStint.season_code == season, PersonStint.type == "J")
+                .group_by(PersonStint.person_code)
+            )
+        }
+        last_club: dict[str, str] = {}
+        for pc, cc in session.execute(
+            select(g.player_code, g.club_code)
+            .where(g.season_code == season)
+            .order_by(g.game_code)
+        ):
+            last_club[pc] = cc
+        clubs = load_clubs(session)
+
+        players = []
+        for code, name, pts, fg2m, fg2a, fg3m, fg3a, ftm, fta in rows:
+            pts, fg2m, fg2a, fg3m, fg3a, ftm, fta = (
+                x or 0 for x in (pts, fg2m, fg2a, fg3m, fg3a, ftm, fta)
+            )
+            fga = fg2a + fg3a
+            fgm = fg2m + fg3m
+            club = clubs.get(last_club.get(code, ""))
+            players.append({
+                "playerCode": code, "name": name,
+                "imageUrl": images.get(code),
+                "clubCode": club.code if club else None,
+                "clubCrest": club.crest_url if club else None,
+                "fga": fga, "fg3a": fg3a, "fg2a": fg2a, "fta": fta,
+                "ts": round(100 * pts / (2 * (fga + 0.44 * fta)), 1)
+                if (fga + fta) else None,
+                "efg": round(100 * (fgm + 0.5 * fg3m) / fga, 1) if fga else None,
+                "fg3Pct": round(100 * fg3m / fg3a, 1) if fg3a else None,
+                "fg2Pct": round(100 * fg2m / fg2a, 1) if fg2a else None,
+                "ftPct": round(100 * ftm / fta, 1) if fta else None,
+                "fg3Made": fg3m, "fg2Made": fg2m, "ftMade": ftm,
+            })
+
+        def top(key, label, sub, thr_key, thr, fmt):
+            pool = [p for p in players if p[key] is not None and p[thr_key] >= thr]
+            ranked = sorted(pool, key=lambda p: -p[key])[:limit]
+            return {
+                "key": key, "label": label, "sub": sub,
+                "entries": [
+                    {
+                        "playerCode": p["playerCode"], "name": p["name"],
+                        "imageUrl": p["imageUrl"], "clubCrest": p["clubCrest"],
+                        "value": p[key], "detail": fmt(p),
+                    }
+                    for p in ranked
+                ],
+            }
+
+        return {
+            "season": season,
+            "categories": [
+                top("ts", "True shooting %", "min 150 FGA", "fga", 150,
+                    lambda p: f"{p['fga']} FGA"),
+                top("efg", "Effective FG %", "min 150 FGA", "fga", 150,
+                    lambda p: f"{p['fga']} FGA"),
+                top("fg3Pct", "3-point %", "min 60 3PA", "fg3a", 60,
+                    lambda p: f"{p['fg3Made']}/{p['fg3a']}"),
+                top("fg2Pct", "2-point %", "min 100 2PA", "fg2a", 100,
+                    lambda p: f"{p['fg2Made']}/{p['fg2a']}"),
+                top("ftPct", "Free throw %", "min 50 FTA", "fta", 50,
+                    lambda p: f"{p['ftMade']}/{p['fta']}"),
+            ],
+        }
+
+
 HIGH_CATEGORIES = [
     ("points", "Points", PlayerGameStat.points),
     ("rebounds", "Rebounds", PlayerGameStat.treb),

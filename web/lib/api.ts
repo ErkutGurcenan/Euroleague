@@ -399,6 +399,27 @@ export type HighEntry = {
   utcDate: string | null;
 };
 
+export type ShootingEntry = {
+  playerCode: string;
+  name: string | null;
+  imageUrl: string | null;
+  clubCrest: string | null;
+  value: number;
+  detail: string;
+};
+
+export function getShootingLeaders(season?: string) {
+  return get<{
+    season: string;
+    categories: {
+      key: string;
+      label: string;
+      sub: string;
+      entries: ShootingEntry[];
+    }[];
+  }>(`/api/shooting${qs({ season })}`);
+}
+
 export function getHighs(season?: string) {
   return get<{
     season: string;
