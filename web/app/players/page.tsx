@@ -2,6 +2,7 @@ export const metadata = { title: "Players" };
 
 import Link from "next/link";
 import Headshot from "@/components/Headshot";
+import PlayersToggle from "@/components/PlayersToggle";
 import TeamFilterSelect from "@/components/TeamFilterSelect";
 import { getPlayers, getTransfers, type PlayerSummary } from "@/lib/api";
 import { currentSeason } from "@/lib/season";
@@ -56,10 +57,13 @@ export default async function PlayersPage({
 
   return (
     <div>
-      <div className="mb-4 flex items-baseline justify-between">
-        <h1 className="text-2xl font-bold">Players</h1>
-        <span className="text-sm text-neutral-400">
-          Per-game averages · min. {minGames} game{minGames === 1 ? "" : "s"}
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold">Players</h1>
+          <PlayersToggle active="pergame" />
+        </div>
+        <span className="hidden text-sm text-neutral-400 sm:inline">
+          per-game averages · min. {minGames} game{minGames === 1 ? "" : "s"}
         </span>
       </div>
 

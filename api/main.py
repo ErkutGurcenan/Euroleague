@@ -19,6 +19,7 @@ from euroleague_pipeline.models import (  # noqa: E402
     Award,
     Club,
     Game,
+    GameReferee,
     PbpEvent,
     PersonStint,
     PlayerGameStat,
@@ -287,6 +288,61 @@ def head_to_head(a: str, b: str) -> dict:
             "biggestWin": {"a": biggest[a], "b": biggest[b]},
             "meetings": meetings,
         }
+
+
+@app.get("/api/referees")
+def referees(season: str = DEFAULT_SEASON, min_games: int = 8) -> dict:
+    """Per-referee officiating profile for a season."""
+    with Session(engine) as session:
+        games = {
+            gm.game_code: gm
+            for gm in session.execute(
+                select(Game).where(Game.season_code == season, Game.played)
+            ).scalars()
+        }
+        fouls_by_game: dict[int, int] = {}
+        for gc, f in session.execute(
+            select(PlayerGameStat.game_code, func.sum(PlayerGameStat.fouls_committed))
+            .where(PlayerGameStat.season_code == season)
+            .group_by(PlayerGameStat.game_code)
+        ):
+            fouls_by_game[gc] = f or 0
+
+        refs: dict[str, dict] = {}
+        for r in session.execute(
+            select(GameReferee).where(GameReferee.season_code == season)
+        ).scalars():
+            gm = games.get(r.game_code)
+            if gm is None or gm.local_score is None or gm.road_score is None:
+                continue
+            d = refs.setdefault(
+                r.referee_code,
+                {"name": r.name, "country": r.country_code,
+                 "games": 0, "homeWins": 0, "points": 0, "fouls": 0, "foulGames": 0},
+            )
+            d["games"] += 1
+            if gm.local_score > gm.road_score:
+                d["homeWins"] += 1
+            d["points"] += gm.local_score + gm.road_score
+            if r.game_code in fouls_by_game:
+                d["fouls"] += fouls_by_game[r.game_code]
+                d["foulGames"] += 1
+
+        out = []
+        for code, d in refs.items():
+            if d["games"] < min_games:
+                continue
+            out.append({
+                "code": code,
+                "name": d["name"],
+                "country": d["country"],
+                "games": d["games"],
+                "homeWinPct": round(100 * d["homeWins"] / d["games"], 1),
+                "avgPoints": round(d["points"] / d["games"], 1),
+                "avgFouls": round(d["fouls"] / d["foulGames"], 1) if d["foulGames"] else None,
+            })
+        out.sort(key=lambda r: -r["games"])
+        return {"season": season, "minGames": min_games, "referees": out}
 
 
 @app.get("/api/champions")
@@ -1072,6 +1128,93 @@ def alltime_leaderboards(limit: int = 10, min_games: int = 50) -> dict:
                 top("rpg", "Rebounds per game", "rpg", True),
                 top("apg", "Assists per game", "apg", True),
                 top("pirpg", "PIR per game", "pir", True),
+            ],
+        }
+
+
+@app.get("/api/shooting")
+def shooting_leaders(season: str = DEFAULT_SEASON, limit: int = 10) -> dict:
+    """Shooting-efficiency leaders for a season (advanced + raw percentages)."""
+    g = PlayerGameStat
+    with Session(engine) as session:
+        rows = session.execute(
+            select(
+                g.player_code,
+                func.max(g.player_name),
+                func.sum(g.points),
+                func.sum(g.fg2m), func.sum(g.fg2a),
+                func.sum(g.fg3m), func.sum(g.fg3a),
+                func.sum(g.ftm), func.sum(g.fta),
+            ).where(g.season_code == season).group_by(g.player_code)
+        ).all()
+        images = {
+            code: url
+            for code, url in session.execute(
+                select(PersonStint.person_code, func.max(PersonStint.image_url))
+                .where(PersonStint.season_code == season, PersonStint.type == "J")
+                .group_by(PersonStint.person_code)
+            )
+        }
+        last_club: dict[str, str] = {}
+        for pc, cc in session.execute(
+            select(g.player_code, g.club_code)
+            .where(g.season_code == season)
+            .order_by(g.game_code)
+        ):
+            last_club[pc] = cc
+        clubs = load_clubs(session)
+
+        players = []
+        for code, name, pts, fg2m, fg2a, fg3m, fg3a, ftm, fta in rows:
+            pts, fg2m, fg2a, fg3m, fg3a, ftm, fta = (
+                x or 0 for x in (pts, fg2m, fg2a, fg3m, fg3a, ftm, fta)
+            )
+            fga = fg2a + fg3a
+            fgm = fg2m + fg3m
+            club = clubs.get(last_club.get(code, ""))
+            players.append({
+                "playerCode": code, "name": name,
+                "imageUrl": images.get(code),
+                "clubCode": club.code if club else None,
+                "clubCrest": club.crest_url if club else None,
+                "fga": fga, "fg3a": fg3a, "fg2a": fg2a, "fta": fta,
+                "ts": round(100 * pts / (2 * (fga + 0.44 * fta)), 1)
+                if (fga + fta) else None,
+                "efg": round(100 * (fgm + 0.5 * fg3m) / fga, 1) if fga else None,
+                "fg3Pct": round(100 * fg3m / fg3a, 1) if fg3a else None,
+                "fg2Pct": round(100 * fg2m / fg2a, 1) if fg2a else None,
+                "ftPct": round(100 * ftm / fta, 1) if fta else None,
+                "fg3Made": fg3m, "fg2Made": fg2m, "ftMade": ftm,
+            })
+
+        def top(key, label, sub, thr_key, thr, fmt):
+            pool = [p for p in players if p[key] is not None and p[thr_key] >= thr]
+            ranked = sorted(pool, key=lambda p: -p[key])[:limit]
+            return {
+                "key": key, "label": label, "sub": sub,
+                "entries": [
+                    {
+                        "playerCode": p["playerCode"], "name": p["name"],
+                        "imageUrl": p["imageUrl"], "clubCrest": p["clubCrest"],
+                        "value": p[key], "detail": fmt(p),
+                    }
+                    for p in ranked
+                ],
+            }
+
+        return {
+            "season": season,
+            "categories": [
+                top("ts", "True shooting %", "min 150 FGA", "fga", 150,
+                    lambda p: f"{p['fga']} FGA"),
+                top("efg", "Effective FG %", "min 150 FGA", "fga", 150,
+                    lambda p: f"{p['fga']} FGA"),
+                top("fg3Pct", "3-point %", "min 60 3PA", "fg3a", 60,
+                    lambda p: f"{p['fg3Made']}/{p['fg3a']}"),
+                top("fg2Pct", "2-point %", "min 100 2PA", "fg2a", 100,
+                    lambda p: f"{p['fg2Made']}/{p['fg2a']}"),
+                top("ftPct", "Free throw %", "min 50 FTA", "fta", 50,
+                    lambda p: f"{p['ftMade']}/{p['fta']}"),
             ],
         }
 

@@ -399,6 +399,27 @@ export type HighEntry = {
   utcDate: string | null;
 };
 
+export type ShootingEntry = {
+  playerCode: string;
+  name: string | null;
+  imageUrl: string | null;
+  clubCrest: string | null;
+  value: number;
+  detail: string;
+};
+
+export function getShootingLeaders(season?: string) {
+  return get<{
+    season: string;
+    categories: {
+      key: string;
+      label: string;
+      sub: string;
+      entries: ShootingEntry[];
+    }[];
+  }>(`/api/shooting${qs({ season })}`);
+}
+
 export function getHighs(season?: string) {
   return get<{
     season: string;
@@ -523,6 +544,22 @@ export type HeadToHead = {
 
 export function getHeadToHead(a: string, b: string) {
   return get<HeadToHead>(`/api/head-to-head?a=${a}&b=${b}`);
+}
+
+export type RefereeEntry = {
+  code: string;
+  name: string | null;
+  country: string | null;
+  games: number;
+  homeWinPct: number;
+  avgPoints: number;
+  avgFouls: number | null;
+};
+
+export function getReferees(season?: string) {
+  return get<{ season: string; minGames: number; referees: RefereeEntry[] }>(
+    `/api/referees${qs({ season })}`,
+  );
 }
 
 export type ChampionClub = {

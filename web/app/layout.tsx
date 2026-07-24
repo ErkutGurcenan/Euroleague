@@ -38,6 +38,7 @@ const navLinks = [
   { href: "/all-time", label: "All-time" },
   { href: "/notable", label: "Notable" },
   { href: "/honor", label: "Honor" },
+  { href: "/referees", label: "Referees" },
   { href: "/compare", label: "Compare" },
 ];
 
