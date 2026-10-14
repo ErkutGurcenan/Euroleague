@@ -38,7 +38,34 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-DEFAULT_SEASON = "E2025"
+def latest_played_season() -> str:
+    """Newest season with at least one played game. Read once at startup,
+    so restart the API after a new season's first ingest."""
+    with engine.connect() as conn:
+        code = conn.execute(
+            select(func.max(Game.season_code)).where(Game.played)
+        ).scalar()
+    return code or "E2025"
+
+
+DEFAULT_SEASON = latest_played_season()
+FULL_SEASON_GAMES = 34  # regular-season games per club in the 18/20-team era
+
+
+def season_progress(session, season: str) -> float:
+    """Share of a regular season played (0-1), by the busiest club's games.
+    Used to scale full-season qualifying minimums early in a season."""
+    rows = session.execute(
+        select(Game.local_club_code, Game.road_club_code).where(
+            Game.season_code == season, Game.played, Game.phase_type == "RS"
+        )
+    ).all()
+    per_club: dict[str, int] = {}
+    for home, away in rows:
+        for code in (home, away):
+            per_club[code] = per_club.get(code, 0) + 1
+    most = max(per_club.values(), default=0)
+    return min(1.0, most / FULL_SEASON_GAMES)
 
 
 def season_label(code: str) -> str:
@@ -291,9 +318,11 @@ def head_to_head(a: str, b: str) -> dict:
 
 
 @app.get("/api/referees")
-def referees(season: str = DEFAULT_SEASON, min_games: int = 8) -> dict:
+def referees(season: str = DEFAULT_SEASON, min_games: Optional[int] = None) -> dict:
     """Per-referee officiating profile for a season."""
     with Session(engine) as session:
+        if min_games is None:
+            min_games = max(1, round(8 * season_progress(session, season)))
         games = {
             gm.game_code: gm
             for gm in session.execute(
@@ -1187,7 +1216,11 @@ def shooting_leaders(season: str = DEFAULT_SEASON, limit: int = 10) -> dict:
                 "fg3Made": fg3m, "fg2Made": fg2m, "ftMade": ftm,
             })
 
-        def top(key, label, sub, thr_key, thr, fmt):
+        progress = season_progress(session, season)
+
+        def top(key, label, unit, thr_key, full_thr, fmt):
+            thr = max(1, round(full_thr * progress))
+            sub = f"min {thr} {unit}"
             pool = [p for p in players if p[key] is not None and p[thr_key] >= thr]
             ranked = sorted(pool, key=lambda p: -p[key])[:limit]
             return {
@@ -1205,15 +1238,15 @@ def shooting_leaders(season: str = DEFAULT_SEASON, limit: int = 10) -> dict:
         return {
             "season": season,
             "categories": [
-                top("ts", "True shooting %", "min 150 FGA", "fga", 150,
+                top("ts", "True shooting %", "FGA", "fga", 150,
                     lambda p: f"{p['fga']} FGA"),
-                top("efg", "Effective FG %", "min 150 FGA", "fga", 150,
+                top("efg", "Effective FG %", "FGA", "fga", 150,
                     lambda p: f"{p['fga']} FGA"),
-                top("fg3Pct", "3-point %", "min 60 3PA", "fg3a", 60,
+                top("fg3Pct", "3-point %", "3PA", "fg3a", 60,
                     lambda p: f"{p['fg3Made']}/{p['fg3a']}"),
-                top("fg2Pct", "2-point %", "min 100 2PA", "fg2a", 100,
+                top("fg2Pct", "2-point %", "2PA", "fg2a", 100,
                     lambda p: f"{p['fg2Made']}/{p['fg2a']}"),
-                top("ftPct", "Free throw %", "min 50 FTA", "fta", 50,
+                top("ftPct", "Free throw %", "FTA", "fta", 50,
                     lambda p: f"{p['ftMade']}/{p['fta']}"),
             ],
         }

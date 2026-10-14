@@ -25,6 +25,8 @@ Postgres-compatible for production.
 cd pipeline
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/python -m euroleague_pipeline.ingest --season E2025
+# Keep the current season fresh (run nightly from cron):
+./refresh.sh
 
 # 2. Run the API (http://localhost:8000)
 cd ../api
