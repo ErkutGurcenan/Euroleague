@@ -4,7 +4,10 @@ Run from api/:  ../pipeline/.venv/bin/uvicorn main:app --reload
 """
 from __future__ import annotations
 
+import json
+import re
 import sys
+import unicodedata
 from pathlib import Path
 from typing import Optional
 
@@ -314,6 +317,113 @@ def head_to_head(a: str, b: str) -> dict:
             },
             "biggestWin": {"a": biggest[a], "b": biggest[b]},
             "meetings": meetings,
+        }
+
+
+INJURIES_PATH = REPO_ROOT / "pipeline" / "data" / "injuries.json"
+
+
+def name_tokens(s: str) -> list[str]:
+    s = unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode().lower()
+    return re.sub(r"[^a-z ]", " ", s.replace("-", " ")).split()
+
+
+def name_matches(source: list[str], db_name: str) -> bool:
+    """'Mike James' vs 'JAMES, MIKE': every surname token present and the
+    first-name initials agree (sources often abbreviate, e.g. 'D. Karutasu')."""
+    last, _, first = db_name.partition(",")
+    lt, ft = name_tokens(last), name_tokens(first)
+    if not lt or not all(t in source for t in lt):
+        return False
+    return not ft or not source or ft[0][0] == source[0][0]
+
+
+@app.get("/api/injuries")
+def injuries() -> dict:
+    """Current injury report (editorial file, see pipeline/data/injuries.json)
+    enriched with person codes, headshots and games missed from our data."""
+    report = json.loads(INJURIES_PATH.read_text())
+    season = report["season"]
+    with Session(engine) as session:
+        clubs = load_clubs(session)
+        stints = session.execute(
+            select(PersonStint.person_code, PersonStint.name, PersonStint.club_code,
+                   PersonStint.season_code, PersonStint.image_url)
+            .where(PersonStint.type == "J")
+            .order_by(PersonStint.season_code.desc())
+        ).all()
+
+        def find_person(club: str, player: str) -> Optional[tuple]:
+            src = name_tokens(player)
+            pools = [
+                [s for s in stints if s.season_code == season and s.club_code == club],
+                [s for s in stints if s.club_code == club],
+                stints,
+            ]
+            for pool in pools:
+                codes = {s.person_code for s in pool if s.name and name_matches(src, s.name)}
+                if len(codes) == 1:
+                    code = codes.pop()
+                    image = next(
+                        (s.image_url for s in stints if s.person_code == code and s.image_url),
+                        None,
+                    )
+                    return code, image
+                if len(codes) > 1:
+                    return None
+            return None
+
+        club_games: dict[str, list[tuple]] = {}
+        for gm in session.execute(
+            select(Game).where(Game.season_code == season, Game.played)
+            .order_by(Game.utc_date)
+        ).scalars():
+            for code, opp in ((gm.local_club_code, gm.road_club_code),
+                              (gm.road_club_code, gm.local_club_code)):
+                club_games.setdefault(code, []).append((gm.game_code, gm.utc_date, gm.round, opp))
+        appearances: dict[str, set[int]] = {}
+        for pc, gc in session.execute(
+            select(PlayerGameStat.player_code, PlayerGameStat.game_code)
+            .where(PlayerGameStat.season_code == season)
+        ):
+            appearances.setdefault(pc, set()).add(gc)
+
+        entries = []
+        for e in report["entries"]:
+            club = clubs.get(e["club"])
+            found = find_person(e["club"], e["player"])
+            person_code, image = found if found else (None, None)
+            games = club_games.get(e["club"], [])
+            played = appearances.get(person_code, set()) if person_code else set()
+            last = None
+            missed = 0
+            for game_code, date, rnd, opp in reversed(games):
+                if game_code in played:
+                    opp_club = clubs.get(opp)
+                    last = {
+                        "gameCode": game_code,
+                        "round": rnd,
+                        "date": date.isoformat() + "Z" if date else None,
+                        "opponent": opp_club.abbreviated_name if opp_club else opp,
+                    }
+                    break
+                missed += 1
+            entries.append({
+                **e,
+                "personCode": person_code,
+                "imageUrl": image,
+                "clubName": club.name if club else e["club"],
+                "clubCrest": club.crest_url if club else None,
+                "gamesPlayed": len(played),
+                "gamesMissed": missed if person_code else None,
+                "lastGame": last,
+            })
+        return {
+            "season": season,
+            "source": report["source"],
+            "sourceUrl": report["sourceUrl"],
+            "sourceUpdated": report["sourceUpdated"],
+            "entries": entries,
         }
 
 

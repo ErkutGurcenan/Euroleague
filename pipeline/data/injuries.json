@@ -1,0 +1,113 @@
+{
+  "season": "E2026",
+  "source": "BasketNews EuroLeague Injury Report",
+  "sourceUrl": "https://basketnews.com/news-212393-euroleague-injury-report-updated.html",
+  "sourceUpdated": "2026-10-14T16:23",
+  "entries": [
+    {"club": "IST", "player": "Isaia Cordinier", "pos": "PG", "status": "Out", "reason": "injury", "rounds": "Indefinitely", "note": "Rehab after surgery"},
+    {"club": "IST", "player": "Ruzgar Fenemen", "pos": "PG", "status": "Uncertain", "reason": "coach", "rounds": "5", "note": "DNP Rounds 1-4"},
+    {"club": "IST", "player": "Mike James", "pos": "PG", "status": "Out", "reason": "injury", "rounds": "Season", "note": "Achilles tendon injury in Round 3, had surgery"},
+    {"club": "IST", "player": "D. Karutasu", "pos": "SF", "status": "Uncertain", "reason": "coach", "rounds": "5", "note": "DNP Rounds 1-4"},
+    {"club": "IST", "player": "David Mutaf", "pos": "PG", "status": "Uncertain", "reason": "coach", "rounds": "5", "note": "DNP Rounds 1-4, played in domestic league Oct 11"},
+    {"club": "IST", "player": "Georgios Papagiannis", "pos": "C", "status": "Out", "reason": "injury", "rounds": "Indefinitely", "note": "Left knee ACL"},
+
+    {"club": "MIL", "player": "Nicola Akele", "pos": "SF", "status": "Uncertain", "reason": "coach", "rounds": "6", "note": "DNP Rounds 2-5"},
+    {"club": "MIL", "player": "Diego Flaccadori", "pos": "PG", "status": "Uncertain", "reason": "coach", "rounds": "6", "note": "DNP Rounds 2-5"},
+
+    {"club": "BES", "player": "Yagiz Aksu", "pos": "PG", "status": "Out", "reason": "roster", "rounds": "5", "note": "Left out of the 12-man roster"},
+    {"club": "BES", "player": "DaQuan Jeffries", "pos": "SF", "status": "Out", "reason": "injury", "rounds": "Indefinitely", "note": "Left wrist fracture in Round 1"},
+
+    {"club": "RED", "player": "Jovan Bikic", "pos": "SF", "status": "Out", "reason": "roster", "rounds": "Indefinitely", "note": "Not registered for the EuroLeague"},
+    {"club": "RED", "player": "Andrej Bjelic", "pos": "PG", "status": "Uncertain", "reason": "coach", "rounds": "6", "note": "DNP Rounds 1-5"},
+    {"club": "RED", "player": "Ebuka Izundu", "pos": "C", "status": "Uncertain", "reason": "injury", "rounds": "6", "note": "Ankle, missed Round 5"},
+    {"club": "RED", "player": "Vojin Medarevic", "pos": "C", "status": "Out", "reason": "roster", "rounds": "Indefinitely", "note": "Not registered for the EuroLeague"},
+    {"club": "RED", "player": "Stefan Miljenovic", "pos": "PG", "status": "Uncertain", "reason": "coach", "rounds": "6", "note": "DNP Rounds 4-5"},
+    {"club": "RED", "player": "Johnathan Motley", "pos": "C", "status": "Out", "reason": "injury", "rounds": "4-8", "note": "Groin"},
+    {"club": "RED", "player": "Aleksej Nedeljkovic", "pos": "SF", "status": "Out", "reason": "roster", "rounds": "Indefinitely", "note": "Not registered for the EuroLeague"},
+    {"club": "RED", "player": "Ognjen Simjanovski", "pos": "PG", "status": "Out", "reason": "roster", "rounds": "Indefinitely", "note": "Not registered for the EuroLeague"},
+
+    {"club": "DUB", "player": "Awudu Abass", "pos": "SF", "status": "Out", "reason": "roster", "rounds": "Indefinitely", "note": "Not registered for the EuroLeague"},
+    {"club": "DUB", "player": "Justin Anderson", "pos": "SF", "status": "Out", "reason": "injury", "rounds": "1-6", "note": "Hamstring"},
+    {"club": "DUB", "player": "Mouhammadou Jaiteh", "pos": "C", "status": "Out", "reason": "injury", "rounds": "Indefinitely", "note": "Achilles rehab"},
+    {"club": "DUB", "player": "Kenan Kamenjas", "pos": "C", "status": "Out", "reason": "roster", "rounds": "Indefinitely", "note": "Not registered for the EuroLeague"},
+    {"club": "DUB", "player": "Dzanan Musa", "pos": "PG", "status": "Out", "reason": "injury", "rounds": "6", "note": "Knee, individual work expected next week"},
+    {"club": "DUB", "player": "Klemen Prepelic", "pos": "PG", "status": "Out", "reason": "injury", "rounds": "6", "note": "Back, missed Rounds 1-5"},
+    {"club": "DUB", "player": "Tomislav Vuckovic", "pos": "PG", "status": "Out", "reason": "roster", "rounds": "Indefinitely", "note": "Not registered for the EuroLeague"},
+
+    {"club": "MUN", "player": "Kilian Fischer", "pos": "C", "status": "Uncertain", "reason": "coach", "rounds": "5", "note": "DNP Rounds 2-4"},
+    {"club": "MUN", "player": "Rokas Jokubaitis", "pos": "PG", "status": "Ready", "reason": "rest", "rounds": "5", "note": "Cleared after resting in domestic league"},
+    {"club": "MUN", "player": "Vladimir Lucic", "pos": "SF", "status": "Ready", "reason": "rest", "rounds": "5", "note": "Cleared after resting in domestic league"},
+    {"club": "MUN", "player": "Miles Norris", "pos": "SF", "status": "Ready", "reason": "injury", "rounds": "5", "note": "Cleared after dental surgery, missed Round 4"},
+    {"club": "MUN", "player": "Johannes Thiemann", "pos": "C", "status": "Ready", "reason": "rest", "rounds": "5", "note": "Cleared after resting in domestic league"},
+
+    {"club": "BAR", "player": "Abdu Kone", "pos": "C", "status": "Uncertain", "reason": "coach", "rounds": "6", "note": "DNP Rounds 1-5"},
+    {"club": "BAR", "player": "Yoan Makoundou", "pos": "C", "status": "Out", "reason": "injury", "rounds": "1-6", "note": "Left knee"},
+    {"club": "BAR", "player": "Justin Minaya", "pos": "PG", "status": "Out", "reason": "injury", "rounds": "4-6", "note": "Right thigh adductor"},
+
+    {"club": "ULK", "player": "Onuralp Bitim", "pos": "SF", "status": "Uncertain", "reason": "coach", "rounds": "6", "note": "DNP Rounds 1-5"},
+    {"club": "ULK", "player": "Melih Mahmutoglu", "pos": "PG", "status": "Uncertain", "reason": "coach", "rounds": "6", "note": "DNP Rounds 1-5"},
+    {"club": "ULK", "player": "Chris Silva", "pos": "C", "status": "Uncertain", "reason": "coach", "rounds": "6", "note": "DNP Round 5"},
+
+    {"club": "HTA", "player": "Oz Blayzer", "pos": "SF", "status": "Out", "reason": "roster", "rounds": "Indefinitely", "note": "Not registered for the EuroLeague"},
+    {"club": "HTA", "player": "Khadeen Carrington", "pos": "PG", "status": "Out", "reason": "roster", "rounds": "5", "note": "Left out of the 12-man roster"},
+    {"club": "HTA", "player": "Amir Coffey", "pos": "PG", "status": "Ready", "reason": "injury", "rounds": "5", "note": "Cleared after undisclosed injury, missed Rounds 1-4"},
+    {"club": "HTA", "player": "Tyler Ennis", "pos": "PG", "status": "Out", "reason": "injury", "rounds": "Long-term", "note": "Torn Achilles"},
+    {"club": "HTA", "player": "Tomer Ginat", "pos": "SF", "status": "Out", "reason": "injury", "rounds": "5-6", "note": "Knee, missed Rounds 1-4"},
+    {"club": "HTA", "player": "Guy Palatin", "pos": "PG", "status": "Out", "reason": "roster", "rounds": "Indefinitely", "note": "Not registered for the EuroLeague"},
+    {"club": "HTA", "player": "Bar Timor", "pos": "PG", "status": "Out", "reason": "illness", "rounds": "5-6", "note": "Illness, undergoing tests"},
+
+    {"club": "BAS", "player": "Pedro Souza", "pos": "SF", "status": "Uncertain", "reason": "coach", "rounds": "6", "note": "DNP Rounds 2-5"},
+
+    {"club": "ASV", "player": "Juhann Begarin", "pos": "SF", "status": "Uncertain", "reason": "coach", "rounds": "6", "note": "DNP Round 5"},
+    {"club": "ASV", "player": "Mathis Dossou-Yovo", "pos": "C", "status": "Out", "reason": "injury", "rounds": "1-9", "note": "Adductor, out until November"},
+    {"club": "ASV", "player": "Marc-Owen Fodzo Dada", "pos": "PG", "status": "Uncertain", "reason": "coach", "rounds": "6", "note": "DNP Round 5"},
+    {"club": "ASV", "player": "Edwin Jackson", "pos": "SF", "status": "Uncertain", "reason": "coach", "rounds": "6", "note": "DNP Rounds 1-5"},
+
+    {"club": "TEL", "player": "John Dibartolomeo", "pos": "PG", "status": "Uncertain", "reason": "coach", "rounds": "6", "note": "DNP Round 5"},
+    {"club": "TEL", "player": "Amit Ebo", "pos": "PG", "status": "Uncertain", "reason": "coach", "rounds": "6", "note": "DNP Rounds 4-5"},
+    {"club": "TEL", "player": "Gur Lavi", "pos": "SF", "status": "Uncertain", "reason": "injury", "rounds": "6", "note": "Undisclosed injury, missed Rounds 1-5"},
+
+    {"club": "OLY", "player": "Georgios Bourneles", "pos": "PG", "status": "Out", "reason": "coach", "rounds": "6", "note": "Did not travel, DNP Rounds 1-5"},
+    {"club": "OLY", "player": "Antonios Karagiannidis", "pos": "C", "status": "Uncertain", "reason": "coach", "rounds": "6", "note": "DNP Rounds 1-5"},
+    {"club": "OLY", "player": "Omiros Netzipoglou", "pos": "PG", "status": "Uncertain", "reason": "coach", "rounds": "6", "note": "DNP Rounds 1-5"},
+    {"club": "OLY", "player": "George Papas", "pos": "SG", "status": "Uncertain", "reason": "coach", "rounds": "6", "note": "DNP Rounds 1-5"},
+    {"club": "OLY", "player": "Nikolaos Plotas", "pos": "PG", "status": "Out", "reason": "injury", "rounds": "4-12", "note": "Left elbow, hurt in domestic league, about six weeks"},
+
+    {"club": "PAN", "player": "Isaac Bonga", "pos": "SF", "status": "Uncertain", "reason": "injury", "rounds": "6", "note": "Wrist, missed Round 5"},
+    {"club": "PAN", "player": "Ioannis Kouzeloglou", "pos": "C", "status": "Out", "reason": "roster", "rounds": "Indefinitely", "note": "Not registered for the EuroLeague"},
+    {"club": "PAN", "player": "Dimitris Moraitis", "pos": "PG", "status": "Uncertain", "reason": "coach", "rounds": "6", "note": "DNP Rounds 4-5"},
+    {"club": "PAN", "player": "Kendrick Nunn", "pos": "PG", "status": "Uncertain", "reason": "injury", "rounds": "6", "note": "Right meniscus tear, missed Rounds 1-4"},
+    {"club": "PAN", "player": "Kostas Sloukas", "pos": "PG", "status": "Uncertain", "reason": "injury", "rounds": "6", "note": "Leg injury rehab, missed Rounds 1-4"},
+    {"club": "PAN", "player": "Iason Varvaritis", "pos": "PG", "status": "Uncertain", "reason": "coach", "rounds": "6", "note": "DNP Rounds 1-5"},
+
+    {"club": "PRS", "player": "Nobel Boungou-Colo", "pos": "SF", "status": "Out", "reason": "roster", "rounds": "Indefinitely", "note": "Not registered for the EuroLeague"},
+    {"club": "PRS", "player": "Frank Ntilikina", "pos": "PG", "status": "Uncertain", "reason": "coach", "rounds": "5", "note": "DNP Rounds 3-4"},
+    {"club": "PRS", "player": "Maozinha Pereira", "pos": "SF", "status": "Uncertain", "reason": "coach", "rounds": "5", "note": "DNP Rounds 1-4"},
+    {"club": "PRS", "player": "Jared Rhoden", "pos": "PG", "status": "Expected", "reason": "other", "rounds": "5", "note": "Played in domestic league Oct 11 after missing Round 4"},
+
+    {"club": "PAR", "player": "Mitar Bosnjakovic", "pos": "SG", "status": "Out", "reason": "roster", "rounds": "Indefinitely", "note": "Not registered for the EuroLeague"},
+    {"club": "PAR", "player": "Uros Danilovic", "pos": "SF", "status": "Uncertain", "reason": "coach", "rounds": "6", "note": "DNP Rounds 2-5"},
+    {"club": "PAR", "player": "Vanja Marinkovic", "pos": "SF", "status": "Out", "reason": "injury", "rounds": "Indefinitely", "note": "Recovering from Achilles surgery"},
+    {"club": "PAR", "player": "Mario Nakic", "pos": "SF", "status": "Uncertain", "reason": "other", "rounds": "6", "note": "Missed Round 5, reason undisclosed"},
+    {"club": "PAR", "player": "Jabari Parker", "pos": "PF", "status": "Out", "reason": "roster", "rounds": "Indefinitely", "note": "Out of the squad"},
+    {"club": "PAR", "player": "Lamar Stevens", "pos": "SF", "status": "Game-time", "reason": "illness", "rounds": "6", "note": "Stomach problems"},
+    {"club": "PAR", "player": "Derek Willis", "pos": "C", "status": "Out", "reason": "injury", "rounds": "2-6", "note": "Ankle, hurt in Round 1, reassessment in 3-4 weeks"},
+
+    {"club": "MAD", "player": "Gabriel Deck", "pos": "SF", "status": "Out", "reason": "injury", "rounds": "Long-term", "note": "Left shoulder, surgery, 4-5 months"},
+    {"club": "MAD", "player": "Usman Garuba", "pos": "C", "status": "Out", "reason": "injury", "rounds": "Long-term", "note": "Torn ACL"},
+    {"club": "MAD", "player": "Sergio Llull", "pos": "PG", "status": "Uncertain", "reason": "coach", "rounds": "6", "note": "DNP Rounds 1-5"},
+    {"club": "MAD", "player": "Olivier Sarr", "pos": "C", "status": "Uncertain", "reason": "coach", "rounds": "6", "note": "DNP Rounds 1-5"},
+    {"club": "MAD", "player": "Max Shulga", "pos": "SF", "status": "Uncertain", "reason": "coach", "rounds": "6", "note": "DNP Rounds 1-5"},
+
+    {"club": "PAM", "player": "Mouhamadou Gueye", "pos": "SF", "status": "Uncertain", "reason": "coach", "rounds": "6", "note": "DNP Rounds 2-5"},
+    {"club": "PAM", "player": "Lucas Mari", "pos": "SG", "status": "Uncertain", "reason": "coach", "rounds": "6", "note": "DNP Rounds 2-5"},
+    {"club": "PAM", "player": "Yankuba Sima", "pos": "C", "status": "Uncertain", "reason": "coach", "rounds": "6", "note": "DNP Rounds 2-5"},
+
+    {"club": "VIR", "player": "Matteo Baiocchi", "pos": "PG", "status": "Uncertain", "reason": "coach", "rounds": "5", "note": "DNP Rounds 1-4"},
+    {"club": "VIR", "player": "Davide Casarin", "pos": "PG", "status": "Uncertain", "reason": "coach", "rounds": "5", "note": "DNP Rounds 1-4, played in domestic league Oct 11"},
+
+    {"club": "ZAL", "player": "Kaodirichi Akobundu-Ehiogu", "pos": "C", "status": "Uncertain", "reason": "coach", "rounds": "6", "note": "DNP Rounds 1-5"},
+    {"club": "ZAL", "player": "Dovydas Giedraitis", "pos": "PG", "status": "Uncertain", "reason": "coach", "rounds": "6", "note": "DNP Round 5"},
+    {"club": "ZAL", "player": "Nigel Williams-Goss", "pos": "PG", "status": "Uncertain", "reason": "injury", "rounds": "6", "note": "Hamstring, hurt in Round 1, missed Rounds 2-5"}
+  ]
+}
