@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import FranchiseHistory from "@/components/FranchiseHistory";
 import GameCard from "@/components/GameCard";
 import Headshot from "@/components/Headshot";
+import { isMedical, StatusPill } from "@/components/InjuryStatus";
 import ShotChartExplorer from "@/components/ShotChartExplorer";
 import { getClub, getClubHistory, getClubShots, getInjuries } from "@/lib/api";
 import { currentSeason } from "@/lib/season";
@@ -59,12 +60,7 @@ export default async function TeamPage({
   const upcoming = games.filter((g) => !g.played);
   const injured =
     injuryReport && (!season || season === injuryReport.season)
-      ? injuryReport.entries.filter(
-          (e) =>
-            e.club === club.code &&
-            (e.reason === "injury" || e.reason === "illness") &&
-            e.status !== "Ready",
-        )
+      ? injuryReport.entries.filter((e) => e.club === club.code && isMedical(e))
       : [];
 
   return (
@@ -205,15 +201,7 @@ export default async function TeamPage({
                   </div>
                   <div className="truncate text-xs text-neutral-400">{e.note}</div>
                 </div>
-                <span
-                  className={`shrink-0 rounded px-1.5 py-0.5 text-xs font-medium ${
-                    e.status === "Out"
-                      ? "bg-red-500/15 text-red-400"
-                      : "bg-amber-500/15 text-amber-300"
-                  }`}
-                >
-                  {e.status}
-                </span>
+                <StatusPill status={e.status} />
               </li>
             ))}
           </ul>

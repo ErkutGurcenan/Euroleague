@@ -2,18 +2,9 @@ export const metadata = { title: "Injury report" };
 
 import Link from "next/link";
 import Headshot from "@/components/Headshot";
+import { isMedical, StatusPill, timeline } from "@/components/InjuryStatus";
 import { getInjuries, type InjuryEntry } from "@/lib/api";
 import { seasonLabel } from "@/lib/season";
-
-const STATUS_STYLES: Record<string, string> = {
-  Out: "bg-red-500/15 text-red-400",
-  Doubtful: "bg-orange-500/15 text-orange-400",
-  Questionable: "bg-amber-500/15 text-amber-300",
-  "Game-time": "bg-amber-500/15 text-amber-300",
-  Uncertain: "bg-neutral-500/20 text-neutral-300",
-  Expected: "bg-lime-500/15 text-lime-300",
-  Ready: "bg-emerald-500/15 text-emerald-400",
-};
 
 const REASON_LABELS: Record<InjuryEntry["reason"], string> = {
   injury: "Injury",
@@ -23,26 +14,6 @@ const REASON_LABELS: Record<InjuryEntry["reason"], string> = {
   rest: "Rest",
   other: "Undisclosed",
 };
-
-function StatusPill({ status }: { status: string }) {
-  return (
-    <span
-      className={`rounded px-1.5 py-0.5 text-xs font-medium ${
-        STATUS_STYLES[status] ?? STATUS_STYLES.Uncertain
-      }`}
-    >
-      {status}
-    </span>
-  );
-}
-
-function timeline(rounds: string): string {
-  if (rounds === "Season") return "Out for season";
-  const range = rounds.match(/^(\d+)-(\d+)$/);
-  if (range) return `Through Round ${range[2]}`;
-  if (/^\d+$/.test(rounds)) return `Round ${rounds}`;
-  return rounds;
-}
 
 function availability(e: InjuryEntry): string | null {
   if (e.gamesMissed === null) return null;
@@ -91,10 +62,9 @@ function SummaryTile({ label, value, sub }: { label: string; value: number; sub:
 
 export default async function InjuriesPage() {
   const report = await getInjuries();
-  const medical = (e: InjuryEntry) => e.reason === "injury" || e.reason === "illness";
-  const injured = report.entries.filter((e) => medical(e) && e.status !== "Ready");
+  const injured = report.entries.filter(isMedical);
   const cleared = report.entries.filter((e) => e.status === "Ready");
-  const other = report.entries.filter((e) => !medical(e) && e.status !== "Ready");
+  const other = report.entries.filter((e) => !isMedical(e) && e.status !== "Ready");
 
   const byClub = new Map<string, InjuryEntry[]>();
   for (const e of injured) byClub.set(e.club, [...(byClub.get(e.club) ?? []), e]);
