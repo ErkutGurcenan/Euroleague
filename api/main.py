@@ -321,7 +321,12 @@ def head_to_head(a: str, b: str) -> dict:
         }
 
 
-INJURIES_PATH = REPO_ROOT / "pipeline" / "data" / "injuries.json"
+INJURIES_LIVE = REPO_ROOT / "db" / "injuries.json"  # git-ignored; see injuries_check
+INJURIES_SNAPSHOT = REPO_ROOT / "pipeline" / "data" / "injuries.json"
+
+
+def injuries_path() -> Path:
+    return INJURIES_LIVE if INJURIES_LIVE.exists() else INJURIES_SNAPSHOT
 
 
 def name_tokens(s: str) -> list[str]:
@@ -346,7 +351,7 @@ def name_matches(source: list[str], lt: list[str], ft: list[str]) -> bool:
 def injuries() -> dict:
     """Current injury report (editorial file, see pipeline/data/injuries.json)
     enriched with person codes, headshots and games missed from our data."""
-    report = json.loads(INJURIES_PATH.read_text())
+    report = json.loads(injuries_path().read_text())
     season = report["season"]
     with Session(engine) as session:
         clubs = load_clubs(session)
@@ -1418,7 +1423,7 @@ def fantasy(season: str = DEFAULT_SEASON) -> dict:
         clubs = load_clubs(session)
 
     status: dict[str, dict] = {}
-    if INJURIES_PATH.exists():
+    if injuries_path().exists():
         report = injuries()
         if report["season"] == season:
             for e in report["entries"]:
