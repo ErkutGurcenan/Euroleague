@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 export default function Headshot({
   src,
   name,
@@ -9,12 +11,11 @@ export default function Headshot({
 }) {
   if (src) {
     return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
+      <Image
         src={src}
         alt=""
-        loading="lazy"
-        decoding="async"
+        width={size}
+        height={size}
         className="shrink-0 rounded-full bg-neutral-800 object-cover"
         style={{ width: size, height: size }}
       />
