@@ -25,7 +25,10 @@ Postgres-compatible for production.
 cd pipeline
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/python -m euroleague_pipeline.ingest --season E2025
-# Keep the current season fresh (run nightly from cron):
+.venv/bin/python -m euroleague_pipeline.ingest_details --season E2025
+# Season awards are editorial (no API endpoint): data/awards.json -> database
+.venv/bin/python -m euroleague_pipeline.seed_awards
+# Keep the current season fresh (run nightly from cron; also re-applies awards):
 ./refresh.sh
 # The injury report is editorial: pipeline/data/injuries.json, summarized by
 # hand from the BasketNews EuroLeague Injury Report (the API has no injuries).
@@ -39,3 +42,14 @@ cd ../web
 npm install && npm run dev   # development, hot reload
 ./serve.sh                   # production: build + (re)start on :3000
 ```
+
+## Backups
+
+`pipeline/backup.sh` (weekly from cron, Sundays 03:00) makes a consistent
+online copy of the database, checks its integrity, gzips it to
+`~/backups/euroleague/` and keeps the last four.
+
+Restore: stop the API, then
+`gunzip -c ~/backups/euroleague/euroleague-YYYY-MM-DD.db.gz > db/euroleague.db`.
+To rebuild from scratch instead, re-run the ingest steps for each season and
+`seed_awards`; everything else comes from the API.
