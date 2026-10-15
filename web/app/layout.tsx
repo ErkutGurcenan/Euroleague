@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
 import Logo from "@/components/Logo";
+import DesktopNav from "@/components/DesktopNav";
 import MobileNav from "@/components/MobileNav";
 import SearchBox from "@/components/SearchBox";
 import SeasonSelect from "@/components/SeasonSelect";
@@ -27,21 +28,6 @@ export const metadata: Metadata = {
   description:
     "EuroLeague standings, results, shot charts, rosters and stats — Eurostepper",
 };
-
-const navLinks = [
-  { href: "/", label: "Home" },
-  { href: "/standings", label: "Standings" },
-  { href: "/games", label: "Games" },
-  { href: "/teams", label: "Teams" },
-  { href: "/players", label: "Players" },
-  { href: "/injuries", label: "Injuries" },
-  { href: "/highs", label: "Highs" },
-  { href: "/all-time", label: "All-time" },
-  { href: "/notable", label: "Notable" },
-  { href: "/honor", label: "Honor" },
-  { href: "/referees", label: "Referees" },
-  { href: "/compare", label: "Compare" },
-];
 
 export default async function RootLayout({
   children,
@@ -69,18 +55,8 @@ export default async function RootLayout({
               <Logo size={30} />
               Eurostepper
             </Link>
-            <MobileNav links={navLinks} />
-            <nav className="hidden gap-3 text-sm text-neutral-300 lg:flex">
-              {navLinks.map((l) => (
-                <Link
-                  key={l.href}
-                  href={l.href}
-                  className="hover:text-white transition-colors"
-                >
-                  {l.label}
-                </Link>
-              ))}
-            </nav>
+            <MobileNav />
+            <DesktopNav />
             <div className="ml-auto flex items-center gap-3">
               <SearchBox />
               <SeasonSelect seasons={seasons} current={current} />
