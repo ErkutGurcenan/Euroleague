@@ -594,6 +594,49 @@ export function getInjuries() {
   }>("/api/injuries");
 }
 
+export type FantasyPlayer = {
+  playerCode: string;
+  name: string;
+  imageUrl: string | null;
+  position: string | null;
+  age: number | null;
+  clubCode: string;
+  clubName: string | null;
+  clubCrest: string | null;
+  gamesPlayed: number;
+  minutes: number;
+  pir: number;
+  sd: number;
+  cv: number | null;
+  floor: number;
+  ceiling: number;
+  best: number;
+  worst: number;
+  pirPerMin: number | null;
+  last3: number;
+  form: number | null;
+  prevPir: number | null;
+  prevMinutes: number | null;
+  newClub: boolean;
+  injury: { status: string; note: string } | null;
+};
+
+export type FantasyWatchList = {
+  key: "form" | "pirUp" | "role" | "young";
+  label: string;
+  sub: string;
+  players: string[];
+};
+
+export function getFantasy(season?: string) {
+  return get<{
+    season: string;
+    minGames: number;
+    players: FantasyPlayer[];
+    watch: FantasyWatchList[];
+  }>(`/api/fantasy${qs({ season })}`);
+}
+
 export type ChampionClub = {
   code: string;
   name: string;

@@ -5,9 +5,11 @@ import { useRouter, useSearchParams } from "next/navigation";
 export default function TeamFilterSelect({
   teams,
   current,
+  basePath = "/players",
 }: {
   teams: { code: string; name: string }[];
   current: string | null;
+  basePath?: string;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -16,7 +18,7 @@ export default function TeamFilterSelect({
     const params = new URLSearchParams(searchParams.toString());
     if (value) params.set("team", value);
     else params.delete("team");
-    router.push(`/players?${params.toString()}`);
+    router.push(`${basePath}?${params.toString()}`);
   };
 
   return (

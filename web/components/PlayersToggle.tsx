@@ -3,7 +3,7 @@ import Link from "next/link";
 export default function PlayersToggle({
   active,
 }: {
-  active: "pergame" | "shooting";
+  active: "pergame" | "shooting" | "fantasy";
 }) {
   const base = "px-3 py-1 text-xs transition-colors";
   const on = "bg-orange-600 text-white";
@@ -18,6 +18,12 @@ export default function PlayersToggle({
         className={`${base} ${active === "shooting" ? on : off}`}
       >
         Shooting
+      </Link>
+      <Link
+        href="/fantasy"
+        className={`${base} ${active === "fantasy" ? on : off}`}
+      >
+        Fantasy
       </Link>
     </span>
   );
