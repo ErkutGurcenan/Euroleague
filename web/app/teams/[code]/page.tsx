@@ -2,8 +2,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import FranchiseHistory from "@/components/FranchiseHistory";
 import GameCard from "@/components/GameCard";
+import Headshot from "@/components/Headshot";
+import { isMedical, StatusPill } from "@/components/InjuryStatus";
 import ShotChartExplorer from "@/components/ShotChartExplorer";
-import { getClub, getClubHistory, getClubShots } from "@/lib/api";
+import { getClub, getClubHistory, getClubShots, getInjuries } from "@/lib/api";
 import { currentSeason } from "@/lib/season";
 
 function age(birthDate: string | null): string {
@@ -37,12 +39,13 @@ export default async function TeamPage({
 }) {
   const { code } = await params;
   const season = await currentSeason();
-  let data, shotData, history;
+  let data, shotData, history, injuryReport;
   try {
-    [data, shotData, history] = await Promise.all([
+    [data, shotData, history, injuryReport] = await Promise.all([
       getClub(code.toUpperCase(), season),
       getClubShots(code.toUpperCase(), season),
       getClubHistory(code.toUpperCase()).catch(() => null),
+      getInjuries().catch(() => null),
     ]);
   } catch {
     notFound();
@@ -55,6 +58,10 @@ export default async function TeamPage({
   const activeRoster = roster.filter((p) => p.active);
   const results = games.filter((g) => g.played);
   const upcoming = games.filter((g) => !g.played);
+  const injured =
+    injuryReport && (!season || season === injuryReport.season)
+      ? injuryReport.entries.filter((e) => e.club === club.code && isMedical(e))
+      : [];
 
   return (
     <div>
@@ -164,6 +171,40 @@ export default async function TeamPage({
               </div>
             ))}
           </div>
+        </>
+      )}
+
+      {injured.length > 0 && (
+        <>
+          <div className="mb-3 flex items-baseline justify-between">
+            <h2 className="text-lg font-semibold">Injuries</h2>
+            <Link href="/injuries" className="text-xs text-orange-400 hover:underline">
+              Full injury report →
+            </Link>
+          </div>
+          <ul className="mb-8 grid gap-2 sm:grid-cols-2">
+            {injured.map((e) => (
+              <li
+                key={e.player}
+                className="flex items-center gap-3 rounded-lg border border-neutral-800 bg-neutral-900/40 px-3 py-2"
+              >
+                <Headshot src={e.imageUrl} name={e.player} size={28} />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-medium">
+                    {e.personCode ? (
+                      <Link href={`/players/${e.personCode}`} className="hover:text-orange-400">
+                        {e.player}
+                      </Link>
+                    ) : (
+                      e.player
+                    )}
+                  </div>
+                  <div className="truncate text-xs text-neutral-400">{e.note}</div>
+                </div>
+                <StatusPill status={e.status} />
+              </li>
+            ))}
+          </ul>
         </>
       )}
 

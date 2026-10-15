@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import Headshot from "@/components/Headshot";
 import HeadToHead from "@/components/HeadToHead";
+import { appliesToRound, isMedical, StatusPill, timeline } from "@/components/InjuryStatus";
 import ShotChart from "@/components/ShotChart";
-import { getGame, getHeadToHead, type GameDetailSide } from "@/lib/api";
+import { getGame, getHeadToHead, getInjuries, type GameDetailSide } from "@/lib/api";
 import { currentSeason } from "@/lib/season";
 
 function BoxScoreTable({ side }: { side: GameDetailSide }) {
@@ -158,9 +160,27 @@ export default async function GamePage({
     notFound();
   }
   const { home, away } = game;
-  const h2h =
+  // A current injury report says little about games weeks away.
+  const soon =
+    !game.played &&
+    !!game.utcDate &&
+    new Date(game.utcDate).getTime() - Date.now() < 14 * 24 * 3600 * 1000;
+  const [h2h, injuryReport] = await Promise.all([
     home.club && away.club
-      ? await getHeadToHead(home.club.code, away.club.code).catch(() => null)
+      ? getHeadToHead(home.club.code, away.club.code).catch(() => null)
+      : null,
+    soon ? getInjuries().catch(() => null) : null,
+  ]);
+  const unavailable =
+    injuryReport && injuryReport.season === game.season
+      ? [home, away].map((side) =>
+          injuryReport.entries.filter(
+            (e) =>
+              e.club === side.club?.code &&
+              isMedical(e) &&
+              appliesToRound(e, game.phaseType === "RS" ? game.round : null),
+          ),
+        )
       : null;
   const date = game.utcDate
     ? new Date(game.utcDate).toLocaleString("en-GB", {
@@ -329,6 +349,85 @@ export default async function GamePage({
               </div>
             </>
           )}
+        </>
+      )}
+
+      {unavailable && injuryReport && (
+        <>
+          <div className="mb-3 flex items-baseline justify-between">
+            <h2 className="text-lg font-semibold">Unavailable</h2>
+            <Link href="/injuries" className="text-xs text-orange-400 hover:underline">
+              Full injury report →
+            </Link>
+          </div>
+          <div className="mb-2 grid gap-4 md:grid-cols-2">
+            {[home, away].map((side, i) => (
+              <div
+                key={i}
+                className="rounded-lg border border-neutral-800 bg-neutral-900/40"
+              >
+                <div className="flex items-center gap-2 border-b border-neutral-800 px-4 py-2 text-sm font-semibold">
+                  {side.club?.crestUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={side.club.crestUrl} alt="" className="h-5 w-5 object-contain" />
+                  )}
+                  {side.club?.name}
+                </div>
+                {unavailable[i].length === 0 ? (
+                  <p className="px-4 py-3 text-sm text-neutral-500">
+                    No reported injuries
+                  </p>
+                ) : (
+                  <ul>
+                    {unavailable[i].map((e) => (
+                      <li
+                        key={e.player}
+                        className="flex items-center gap-3 border-t border-neutral-800/40 px-4 py-2 first:border-t-0"
+                      >
+                        <Headshot src={e.imageUrl} name={e.player} size={28} />
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-sm font-medium">
+                            {e.personCode ? (
+                              <Link
+                                href={`/players/${e.personCode}`}
+                                className="hover:text-orange-400"
+                              >
+                                {e.player}
+                              </Link>
+                            ) : (
+                              e.player
+                            )}
+                          </div>
+                          <div className="truncate text-xs text-neutral-400">
+                            {e.note} · {timeline(e.rounds)}
+                          </div>
+                        </div>
+                        <StatusPill status={e.status} />
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            ))}
+          </div>
+          <p className="mb-8 text-xs text-neutral-500">
+            From the injury report of{" "}
+            {new Date(`${injuryReport.sourceUpdated}Z`).toLocaleDateString("en-GB", {
+              day: "numeric",
+              month: "short",
+              timeZone: "UTC",
+            })}
+            , via{" "}
+            <a
+              href={injuryReport.sourceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-neutral-400 hover:text-orange-400"
+            >
+              BasketNews
+            </a>
+            .
+          </p>
         </>
       )}
 

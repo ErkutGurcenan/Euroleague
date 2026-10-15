@@ -8,6 +8,7 @@ import {
   getPlayers,
   getSeasons,
   getStandings,
+  type Game,
   type PlayerSummary,
 } from "@/lib/api";
 import { currentSeason, seasonLabel } from "@/lib/season";
@@ -71,6 +72,36 @@ export default async function HomePage() {
   const runnerUp =
     final && (champion === final.home ? final.away : final.home);
 
+  const byDate = (a: Game, b: Game) =>
+    (a.utcDate ?? "").localeCompare(b.utcDate ?? "");
+  const sameSlot = (a: Game, b: Game) =>
+    a.phaseType === b.phaseType && a.round === b.round && a.groupName === b.groupName;
+  const playedGames = games.games.filter((g) => g.played).sort(byDate);
+  const upcoming = games.games.filter((g) => !g.played).sort(byDate);
+  const lastPlayed = playedGames.at(-1);
+  const nextGame = upcoming[0];
+  const inProgress = !champion && !seasonNote && !!nextGame;
+  const latestGames = lastPlayed
+    ? playedGames.filter((g) => sameSlot(g, lastPlayed))
+    : [];
+  const slotRemaining = lastPlayed
+    ? upcoming.filter((g) => sameSlot(g, lastPlayed)).length
+    : 0;
+  const rsRounds = games.games
+    .filter((g) => g.phaseType === "RS" && g.round !== null)
+    .map((g) => g.round as number);
+  const totalRounds = rsRounds.length ? Math.max(...rsRounds) : null;
+  const slotName = (g: Game) =>
+    g.phaseType === "RS" ? g.roundName : g.groupName ?? g.roundName;
+  const nextDate = nextGame?.utcDate
+    ? new Date(nextGame.utcDate).toLocaleDateString("en-GB", {
+        weekday: "short",
+        day: "numeric",
+        month: "short",
+        timeZone: "UTC",
+      })
+    : null;
+
   const by = (key: keyof PlayerSummary) =>
     [...players.players].sort(
       (a, b) => (b[key] as number) - (a[key] as number),
@@ -112,6 +143,47 @@ export default async function HomePage() {
             <div className="text-lg font-bold">{seasonNote}</div>
           </div>
         </div>
+      )}
+
+      {/* season-in-progress hero */}
+      {inProgress && (
+        <Link
+          href={
+            lastPlayed?.phaseType === "RS" && lastPlayed.round
+              ? `/games?round=${lastPlayed.round}`
+              : "/games"
+          }
+          className="mb-6 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 rounded-xl border border-orange-600/40 bg-neutral-900/60 p-4 transition-colors hover:border-orange-500"
+        >
+          <div className="min-w-0">
+            <div className="text-xs uppercase tracking-wide text-orange-400">
+              {label} EuroLeague · season in progress
+            </div>
+            <div className="text-xl font-bold">
+              {!lastPlayed
+                ? "Tip-off is coming"
+                : slotRemaining > 0
+                  ? `${slotName(lastPlayed)} under way`
+                  : lastPlayed.phaseType === "RS" && totalRounds
+                    ? `${lastPlayed.roundName} of ${totalRounds} complete`
+                    : `${slotName(lastPlayed)} complete`}
+            </div>
+            {slotRemaining > 0 && (
+              <div className="text-sm text-neutral-400">
+                {latestGames.length} of {latestGames.length + slotRemaining}{" "}
+                games played
+              </div>
+            )}
+          </div>
+          {nextGame && (
+            <div className="text-sm text-neutral-400">
+              {slotRemaining > 0
+                ? `Next game: ${nextGame.home.name} vs ${nextGame.away.name}`
+                : `Next up: ${slotName(nextGame)}`}
+              {nextDate && ` · ${slotRemaining > 0 ? "" : "starts "}${nextDate}`} →
+            </div>
+          )}
+        </Link>
       )}
 
       {/* champion hero */}
@@ -285,24 +357,51 @@ export default async function HomePage() {
           ))}
         </div>
 
-        <div>
-          <div className="mb-2 flex items-baseline justify-between">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-300">
-              Final Four
-            </h2>
-            <Link
-              href="/games?phase=FF"
-              className="text-xs text-orange-400 hover:underline"
-            >
-              Bracket →
-            </Link>
+        {ffGames.length > 0 ? (
+          <div>
+            <div className="mb-2 flex items-baseline justify-between">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-300">
+                Final Four
+              </h2>
+              <Link
+                href="/games?phase=FF"
+                className="text-xs text-orange-400 hover:underline"
+              >
+                Bracket →
+              </Link>
+            </div>
+            <div className="grid gap-3">
+              {ffGames.map((g) => (
+                <GameCard key={g.id} game={g} />
+              ))}
+            </div>
           </div>
-          <div className="grid gap-3">
-            {ffGames.map((g) => (
-              <GameCard key={g.id} game={g} />
-            ))}
-          </div>
-        </div>
+        ) : (
+          lastPlayed && (
+            <div>
+              <div className="mb-2 flex items-baseline justify-between">
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-300">
+                  {slotName(lastPlayed)} results
+                </h2>
+                <Link
+                  href={
+                    lastPlayed.phaseType === "RS" && lastPlayed.round
+                      ? `/games?round=${lastPlayed.round}`
+                      : "/games"
+                  }
+                  className="text-xs text-orange-400 hover:underline"
+                >
+                  All games →
+                </Link>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {latestGames.map((g) => (
+                  <GameCard key={g.id} game={g} />
+                ))}
+              </div>
+            </div>
+          )
+        )}
       </div>
     </div>
   );

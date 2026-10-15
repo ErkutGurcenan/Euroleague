@@ -4,7 +4,10 @@ Run from api/:  ../pipeline/.venv/bin/uvicorn main:app --reload
 """
 from __future__ import annotations
 
+import json
+import re
 import sys
+import unicodedata
 from pathlib import Path
 from typing import Optional
 
@@ -38,7 +41,34 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-DEFAULT_SEASON = "E2025"
+def latest_played_season() -> str:
+    """Newest season with at least one played game. Read once at startup,
+    so restart the API after a new season's first ingest."""
+    with engine.connect() as conn:
+        code = conn.execute(
+            select(func.max(Game.season_code)).where(Game.played)
+        ).scalar()
+    return code or "E2025"
+
+
+DEFAULT_SEASON = latest_played_season()
+FULL_SEASON_GAMES = 34  # regular-season games per club in the 18/20-team era
+
+
+def season_progress(session, season: str) -> float:
+    """Share of a regular season played (0-1), by the busiest club's games.
+    Used to scale full-season qualifying minimums early in a season."""
+    rows = session.execute(
+        select(Game.local_club_code, Game.road_club_code).where(
+            Game.season_code == season, Game.played, Game.phase_type == "RS"
+        )
+    ).all()
+    per_club: dict[str, int] = {}
+    for home, away in rows:
+        for code in (home, away):
+            per_club[code] = per_club.get(code, 0) + 1
+    most = max(per_club.values(), default=0)
+    return min(1.0, most / FULL_SEASON_GAMES)
 
 
 def season_label(code: str) -> str:
@@ -290,10 +320,129 @@ def head_to_head(a: str, b: str) -> dict:
         }
 
 
+INJURIES_PATH = REPO_ROOT / "pipeline" / "data" / "injuries.json"
+
+
+def name_tokens(s: str) -> list[str]:
+    s = unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode().lower()
+    return re.sub(r"[^a-z ]", " ", s.replace("-", " ")).split()
+
+
+def split_db_name(db_name: str) -> tuple[list[str], list[str]]:
+    last, _, first = db_name.partition(",")
+    return name_tokens(last), name_tokens(first)
+
+
+def name_matches(source: list[str], lt: list[str], ft: list[str]) -> bool:
+    """'Mike James' vs 'JAMES, MIKE': every surname token present and the
+    first-name initials agree (sources often abbreviate, e.g. 'D. Karutasu')."""
+    if not lt or not all(t in source for t in lt):
+        return False
+    return not ft or not source or ft[0][0] == source[0][0]
+
+
+@app.get("/api/injuries")
+def injuries() -> dict:
+    """Current injury report (editorial file, see pipeline/data/injuries.json)
+    enriched with person codes, headshots and games missed from our data."""
+    report = json.loads(INJURIES_PATH.read_text())
+    season = report["season"]
+    with Session(engine) as session:
+        clubs = load_clubs(session)
+        # (person_code, club, season, surname tokens, first-name tokens)
+        people: list[tuple] = []
+        images: dict[str, str] = {}
+        for code, name, club_code, season_code, image in session.execute(
+            select(PersonStint.person_code, PersonStint.name, PersonStint.club_code,
+                   PersonStint.season_code, PersonStint.image_url)
+            .where(PersonStint.type == "J")
+            .order_by(PersonStint.season_code.desc())
+        ):
+            if image:
+                images.setdefault(code, image)
+            if name:
+                people.append((code, club_code, season_code, *split_db_name(name)))
+        by_club: dict[str, list[tuple]] = {}
+        for p in people:
+            by_club.setdefault(p[1], []).append(p)
+
+        def find_person(club: str, player: str) -> Optional[tuple]:
+            src = name_tokens(player)
+            club_people = by_club.get(club, [])
+            pools = [
+                [p for p in club_people if p[2] == season],
+                club_people,
+                people,
+            ]
+            for pool in pools:
+                codes = {p[0] for p in pool if name_matches(src, p[3], p[4])}
+                if len(codes) == 1:
+                    code = codes.pop()
+                    return code, images.get(code)
+                if len(codes) > 1:
+                    return None
+            return None
+
+        club_games: dict[str, list[tuple]] = {}
+        for gm in session.execute(
+            select(Game).where(Game.season_code == season, Game.played)
+            .order_by(Game.utc_date)
+        ).scalars():
+            for code, opp in ((gm.local_club_code, gm.road_club_code),
+                              (gm.road_club_code, gm.local_club_code)):
+                club_games.setdefault(code, []).append((gm.game_code, gm.utc_date, gm.round, opp))
+        appearances: dict[str, set[int]] = {}
+        for pc, gc in session.execute(
+            select(PlayerGameStat.player_code, PlayerGameStat.game_code)
+            .where(PlayerGameStat.season_code == season)
+        ):
+            appearances.setdefault(pc, set()).add(gc)
+
+        entries = []
+        for e in report["entries"]:
+            club = clubs.get(e["club"])
+            found = find_person(e["club"], e["player"])
+            person_code, image = found if found else (None, None)
+            games = club_games.get(e["club"], [])
+            played = appearances.get(person_code, set()) if person_code else set()
+            last = None
+            missed = 0
+            for game_code, date, rnd, opp in reversed(games):
+                if game_code in played:
+                    opp_club = clubs.get(opp)
+                    last = {
+                        "gameCode": game_code,
+                        "round": rnd,
+                        "date": date.isoformat() + "Z" if date else None,
+                        "opponent": opp_club.abbreviated_name if opp_club else opp,
+                    }
+                    break
+                missed += 1
+            entries.append({
+                **e,
+                "personCode": person_code,
+                "imageUrl": image,
+                "clubName": club.name if club else e["club"],
+                "clubCrest": club.crest_url if club else None,
+                "gamesPlayed": len(played),
+                "gamesMissed": missed if person_code else None,
+                "lastGame": last,
+            })
+        return {
+            "season": season,
+            "source": report["source"],
+            "sourceUrl": report["sourceUrl"],
+            "sourceUpdated": report["sourceUpdated"],
+            "entries": entries,
+        }
+
+
 @app.get("/api/referees")
-def referees(season: str = DEFAULT_SEASON, min_games: int = 8) -> dict:
+def referees(season: str = DEFAULT_SEASON, min_games: Optional[int] = None) -> dict:
     """Per-referee officiating profile for a season."""
     with Session(engine) as session:
+        if min_games is None:
+            min_games = max(1, round(8 * season_progress(session, season)))
         games = {
             gm.game_code: gm
             for gm in session.execute(
@@ -1187,7 +1336,11 @@ def shooting_leaders(season: str = DEFAULT_SEASON, limit: int = 10) -> dict:
                 "fg3Made": fg3m, "fg2Made": fg2m, "ftMade": ftm,
             })
 
-        def top(key, label, sub, thr_key, thr, fmt):
+        progress = season_progress(session, season)
+
+        def top(key, label, unit, thr_key, full_thr, fmt):
+            thr = max(1, round(full_thr * progress))
+            sub = f"min {thr} {unit}"
             pool = [p for p in players if p[key] is not None and p[thr_key] >= thr]
             ranked = sorted(pool, key=lambda p: -p[key])[:limit]
             return {
@@ -1205,15 +1358,15 @@ def shooting_leaders(season: str = DEFAULT_SEASON, limit: int = 10) -> dict:
         return {
             "season": season,
             "categories": [
-                top("ts", "True shooting %", "min 150 FGA", "fga", 150,
+                top("ts", "True shooting %", "FGA", "fga", 150,
                     lambda p: f"{p['fga']} FGA"),
-                top("efg", "Effective FG %", "min 150 FGA", "fga", 150,
+                top("efg", "Effective FG %", "FGA", "fga", 150,
                     lambda p: f"{p['fga']} FGA"),
-                top("fg3Pct", "3-point %", "min 60 3PA", "fg3a", 60,
+                top("fg3Pct", "3-point %", "3PA", "fg3a", 60,
                     lambda p: f"{p['fg3Made']}/{p['fg3a']}"),
-                top("fg2Pct", "2-point %", "min 100 2PA", "fg2a", 100,
+                top("fg2Pct", "2-point %", "2PA", "fg2a", 100,
                     lambda p: f"{p['fg2Made']}/{p['fg2a']}"),
-                top("ftPct", "Free throw %", "min 50 FTA", "fta", 50,
+                top("ftPct", "Free throw %", "FTA", "fta", 50,
                     lambda p: f"{p['ftMade']}/{p['fta']}"),
             ],
         }

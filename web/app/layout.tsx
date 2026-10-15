@@ -34,6 +34,7 @@ const navLinks = [
   { href: "/games", label: "Games" },
   { href: "/teams", label: "Teams" },
   { href: "/players", label: "Players" },
+  { href: "/injuries", label: "Injuries" },
   { href: "/highs", label: "Highs" },
   { href: "/all-time", label: "All-time" },
   { href: "/notable", label: "Notable" },

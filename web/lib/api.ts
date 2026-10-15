@@ -562,6 +562,38 @@ export function getReferees(season?: string) {
   );
 }
 
+export type InjuryEntry = {
+  club: string;
+  clubName: string;
+  clubCrest: string | null;
+  player: string;
+  pos: string;
+  status: string;
+  reason: "injury" | "illness" | "coach" | "roster" | "rest" | "other";
+  rounds: string;
+  note: string;
+  personCode: string | null;
+  imageUrl: string | null;
+  gamesPlayed: number;
+  gamesMissed: number | null;
+  lastGame: {
+    gameCode: number;
+    round: number | null;
+    date: string | null;
+    opponent: string | null;
+  } | null;
+};
+
+export function getInjuries() {
+  return get<{
+    season: string;
+    source: string;
+    sourceUrl: string;
+    sourceUpdated: string;
+    entries: InjuryEntry[];
+  }>("/api/injuries");
+}
+
 export type ChampionClub = {
   code: string;
   name: string;

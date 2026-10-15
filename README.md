@@ -25,6 +25,10 @@ Postgres-compatible for production.
 cd pipeline
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/python -m euroleague_pipeline.ingest --season E2025
+# Keep the current season fresh (run nightly from cron):
+./refresh.sh
+# The injury report is editorial: pipeline/data/injuries.json, summarized by
+# hand from the BasketNews EuroLeague Injury Report (the API has no injuries).
 
 # 2. Run the API (http://localhost:8000)
 cd ../api
@@ -32,5 +36,6 @@ cd ../api
 
 # 3. Run the frontend (http://localhost:3000)
 cd ../web
-npm install && npm run dev
+npm install && npm run dev   # development, hot reload
+./serve.sh                   # production: build + (re)start on :3000
 ```
