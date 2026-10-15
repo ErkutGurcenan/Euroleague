@@ -36,5 +36,6 @@ cd ../api
 
 # 3. Run the frontend (http://localhost:3000)
 cd ../web
-npm install && npm run dev
+npm install && npm run dev   # development, hot reload
+./serve.sh                   # production: build + (re)start on :3000
 ```

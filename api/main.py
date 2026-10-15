@@ -328,11 +328,14 @@ def name_tokens(s: str) -> list[str]:
     return re.sub(r"[^a-z ]", " ", s.replace("-", " ")).split()
 
 
-def name_matches(source: list[str], db_name: str) -> bool:
+def split_db_name(db_name: str) -> tuple[list[str], list[str]]:
+    last, _, first = db_name.partition(",")
+    return name_tokens(last), name_tokens(first)
+
+
+def name_matches(source: list[str], lt: list[str], ft: list[str]) -> bool:
     """'Mike James' vs 'JAMES, MIKE': every surname token present and the
     first-name initials agree (sources often abbreviate, e.g. 'D. Karutasu')."""
-    last, _, first = db_name.partition(",")
-    lt, ft = name_tokens(last), name_tokens(first)
     if not lt or not all(t in source for t in lt):
         return False
     return not ft or not source or ft[0][0] == source[0][0]
@@ -346,29 +349,36 @@ def injuries() -> dict:
     season = report["season"]
     with Session(engine) as session:
         clubs = load_clubs(session)
-        stints = session.execute(
+        # (person_code, club, season, surname tokens, first-name tokens)
+        people: list[tuple] = []
+        images: dict[str, str] = {}
+        for code, name, club_code, season_code, image in session.execute(
             select(PersonStint.person_code, PersonStint.name, PersonStint.club_code,
                    PersonStint.season_code, PersonStint.image_url)
             .where(PersonStint.type == "J")
             .order_by(PersonStint.season_code.desc())
-        ).all()
+        ):
+            if image:
+                images.setdefault(code, image)
+            if name:
+                people.append((code, club_code, season_code, *split_db_name(name)))
+        by_club: dict[str, list[tuple]] = {}
+        for p in people:
+            by_club.setdefault(p[1], []).append(p)
 
         def find_person(club: str, player: str) -> Optional[tuple]:
             src = name_tokens(player)
+            club_people = by_club.get(club, [])
             pools = [
-                [s for s in stints if s.season_code == season and s.club_code == club],
-                [s for s in stints if s.club_code == club],
-                stints,
+                [p for p in club_people if p[2] == season],
+                club_people,
+                people,
             ]
             for pool in pools:
-                codes = {s.person_code for s in pool if s.name and name_matches(src, s.name)}
+                codes = {p[0] for p in pool if name_matches(src, p[3], p[4])}
                 if len(codes) == 1:
                     code = codes.pop()
-                    image = next(
-                        (s.image_url for s in stints if s.person_code == code and s.image_url),
-                        None,
-                    )
-                    return code, image
+                    return code, images.get(code)
                 if len(codes) > 1:
                     return None
             return None
