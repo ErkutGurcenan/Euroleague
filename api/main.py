@@ -153,6 +153,43 @@ def seasons() -> dict:
         }
 
 
+_meta_cache: dict = {}
+
+
+@app.get("/api/meta")
+def meta() -> dict:
+    """Database-wide counts for the About page. Cached for an hour: the
+    counts scan large tables and only change with the nightly refresh."""
+    now = datetime.utcnow()
+    if _meta_cache and (now - _meta_cache["at"]).total_seconds() < 3600:
+        return _meta_cache["data"]
+    _meta_cache.update(at=now, data=_meta_uncached())
+    return _meta_cache["data"]
+
+
+def _meta_uncached() -> dict:
+    with Session(engine) as session:
+        seasons, games, last_game = session.execute(
+            select(func.count(func.distinct(Game.season_code)), func.count(), func.max(Game.utc_date))
+            .where(Game.played)
+        ).one()
+        players = session.execute(
+            select(func.count(func.distinct(PlayerGameStat.player_code)))
+        ).scalar()
+        shots = session.execute(select(func.count()).select_from(Shot)).scalar()
+        events = session.execute(select(func.count()).select_from(PbpEvent)).scalar()
+        first = session.execute(select(func.min(Game.season_code))).scalar()
+        return {
+            "seasons": seasons,
+            "firstSeason": season_label(first) if first else None,
+            "games": games,
+            "players": players,
+            "shots": shots,
+            "playByPlayEvents": events,
+            "lastGame": last_game.isoformat() + "Z" if last_game else None,
+        }
+
+
 AWARD_ORDER = ["MVP", "Final Four MVP", "Rising Star", "Best Defender"]
 
 

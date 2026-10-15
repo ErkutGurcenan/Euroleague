@@ -67,7 +67,10 @@ export default async function RootLayout({
           {children}
         </main>
         <footer className="border-t border-neutral-800 py-4 text-center text-xs text-neutral-600">
-          Data: official EuroLeague API · Unofficial fan project
+          Data: official EuroLeague API · Unofficial fan project ·{" "}
+          <Link href="/about" className="text-neutral-400 hover:text-orange-400">
+            About
+          </Link>
         </footer>
       </body>
     </html>

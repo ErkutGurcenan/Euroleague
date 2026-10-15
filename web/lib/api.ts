@@ -637,6 +637,18 @@ export function getFantasy(season?: string) {
   }>(`/api/fantasy${qs({ season })}`);
 }
 
+export function getMeta() {
+  return get<{
+    seasons: number;
+    firstSeason: string | null;
+    games: number;
+    players: number;
+    shots: number;
+    playByPlayEvents: number;
+    lastGame: string | null;
+  }>("/api/meta");
+}
+
 export type ChampionClub = {
   code: string;
   name: string;
