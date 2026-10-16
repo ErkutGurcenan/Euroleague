@@ -35,13 +35,19 @@ QUARTER_KEYS = [
 
 
 def clean_code(raw: Optional[str]) -> Optional[str]:
-    """API pads codes with spaces and prefixes person codes with P."""
+    """API pads codes with spaces."""
     if not raw:
         return None
-    code = raw.strip()
-    if code.startswith("P") and code[1:].isdigit():
+    return raw.strip() or None
+
+
+def clean_person(raw: Optional[str]) -> Optional[str]:
+    """Person IDs in the live feeds are the people-feed code prefixed with P,
+    for numeric and alphanumeric codes alike (P003469, PTGB)."""
+    code = clean_code(raw)
+    if code and code.startswith("P") and len(code) > 1:
         code = code[1:]
-    return code or None
+    return code
 
 
 def parse_minutes(raw: Optional[str]) -> Optional[int]:
@@ -58,7 +64,7 @@ def boxscore_rows(payload: dict, season: str, game_code: int) -> list[PlayerGame
     rows = []
     for team in payload.get("Stats") or []:
         for p in team.get("PlayersStats") or []:
-            player_code = clean_code(p.get("Player_ID"))
+            player_code = clean_person(p.get("Player_ID"))
             # Minutes is 'DNP' or empty for players who did not enter the game;
             # IsPlaying only flags who was on court at the final buzzer.
             seconds = parse_minutes(p.get("Minutes"))
@@ -108,7 +114,7 @@ def shot_rows(payload: dict, season: str, game_code: int) -> list[Shot]:
                 game_code=game_code,
                 num_anot=s["NUM_ANOT"],
                 club_code=clean_code(s.get("TEAM")),
-                player_code=clean_code(s.get("ID_PLAYER")),
+                player_code=clean_person(s.get("ID_PLAYER")),
                 player_name=s.get("PLAYER"),
                 action_id=action,
                 made=action.endswith("M"),  # 2FGM/3FGM/FTM vs 2FGA/...
@@ -138,7 +144,7 @@ def pbp_rows(payload: dict, season: str, game_code: int) -> list[PbpEvent]:
                     play_number=e["NUMBEROFPLAY"],
                     play_type=(e.get("PLAYTYPE") or "").strip() or None,
                     club_code=clean_code(e.get("CODETEAM")),
-                    player_code=clean_code(e.get("PLAYER_ID")),
+                    player_code=clean_person(e.get("PLAYER_ID")),
                     player_name=e.get("PLAYER"),
                     minute=e.get("MINUTE"),
                     marker_time=e.get("MARKERTIME") or None,

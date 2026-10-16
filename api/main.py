@@ -8,6 +8,7 @@ import json
 import re
 import sys
 import unicodedata
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -149,6 +150,43 @@ def seasons() -> dict:
                 for c in codes
             ],
             "default": DEFAULT_SEASON,
+        }
+
+
+_meta_cache: dict = {}
+
+
+@app.get("/api/meta")
+def meta() -> dict:
+    """Database-wide counts for the About page. Cached for an hour: the
+    counts scan large tables and only change with the nightly refresh."""
+    now = datetime.utcnow()
+    if _meta_cache and (now - _meta_cache["at"]).total_seconds() < 3600:
+        return _meta_cache["data"]
+    _meta_cache.update(at=now, data=_meta_uncached())
+    return _meta_cache["data"]
+
+
+def _meta_uncached() -> dict:
+    with Session(engine) as session:
+        seasons, games, last_game = session.execute(
+            select(func.count(func.distinct(Game.season_code)), func.count(), func.max(Game.utc_date))
+            .where(Game.played)
+        ).one()
+        players = session.execute(
+            select(func.count(func.distinct(PlayerGameStat.player_code)))
+        ).scalar()
+        shots = session.execute(select(func.count()).select_from(Shot)).scalar()
+        events = session.execute(select(func.count()).select_from(PbpEvent)).scalar()
+        first = session.execute(select(func.min(Game.season_code))).scalar()
+        return {
+            "seasons": seasons,
+            "firstSeason": season_label(first) if first else None,
+            "games": games,
+            "players": players,
+            "shots": shots,
+            "playByPlayEvents": events,
+            "lastGame": last_game.isoformat() + "Z" if last_game else None,
         }
 
 
@@ -320,7 +358,12 @@ def head_to_head(a: str, b: str) -> dict:
         }
 
 
-INJURIES_PATH = REPO_ROOT / "pipeline" / "data" / "injuries.json"
+INJURIES_LIVE = REPO_ROOT / "db" / "injuries.json"  # git-ignored; see injuries_check
+INJURIES_SNAPSHOT = REPO_ROOT / "pipeline" / "data" / "injuries.json"
+
+
+def injuries_path() -> Path:
+    return INJURIES_LIVE if INJURIES_LIVE.exists() else INJURIES_SNAPSHOT
 
 
 def name_tokens(s: str) -> list[str]:
@@ -345,7 +388,7 @@ def name_matches(source: list[str], lt: list[str], ft: list[str]) -> bool:
 def injuries() -> dict:
     """Current injury report (editorial file, see pipeline/data/injuries.json)
     enriched with person codes, headshots and games missed from our data."""
-    report = json.loads(INJURIES_PATH.read_text())
+    report = json.loads(injuries_path().read_text())
     season = report["season"]
     with Session(engine) as session:
         clubs = load_clubs(session)
@@ -1370,6 +1413,126 @@ def shooting_leaders(season: str = DEFAULT_SEASON, limit: int = 10) -> dict:
                     lambda p: f"{p['ftMade']}/{p['fta']}"),
             ],
         }
+
+
+def previous_season(code: str) -> str:
+    return f"E{int(code[1:]) - 1}"
+
+
+@app.get("/api/fantasy")
+def fantasy(season: str = DEFAULT_SEASON) -> dict:
+    """PIR-based fantasy view (EuroLeague Fantasy scores on PIR): average,
+    game-to-game spread, PIR per minute, recent form and change vs last
+    season, plus watch lists of observable indicators (not predictions)."""
+    g = PlayerGameStat
+    with Session(engine) as session:
+        logs: dict[str, list[tuple]] = {}
+        for pc, name, club, pir, secs in session.execute(
+            select(g.player_code, g.player_name, g.club_code, g.pir, g.seconds_played)
+            .join(Game, (Game.season_code == g.season_code) & (Game.game_code == g.game_code))
+            .where(g.season_code == season)
+            .order_by(Game.utc_date)
+        ):
+            logs.setdefault(pc, []).append((name, club, pir or 0, secs or 0))
+        if not logs:
+            return {"season": season, "minGames": 0, "players": [], "watch": []}
+        max_gp = max(len(v) for v in logs.values())
+        min_games = max(1, max_gp // 2)
+
+        prev = {}
+        for pc, gp, pir, secs, club in session.execute(
+            select(g.player_code, func.count(), func.sum(g.pir),
+                   func.sum(g.seconds_played), func.max(g.club_code))
+            .where(g.season_code == previous_season(season))
+            .group_by(g.player_code)
+        ):
+            prev[pc] = {"gp": gp, "pir": (pir or 0) / gp,
+                        "minutes": (secs or 0) / 60 / gp, "club": club}
+
+        info = {}
+        for pc, image, pos, born in session.execute(
+            select(PersonStint.person_code, func.max(PersonStint.image_url),
+                   func.max(PersonStint.position_name), func.max(PersonStint.birth_date))
+            .where(PersonStint.season_code == season, PersonStint.type == "J")
+            .group_by(PersonStint.person_code)
+        ):
+            info[pc] = (image, pos, born)
+        clubs = load_clubs(session)
+
+    status: dict[str, dict] = {}
+    if injuries_path().exists():
+        report = injuries()
+        if report["season"] == season:
+            for e in report["entries"]:
+                medical = e["reason"] in ("injury", "illness") and e["status"] != "Ready"
+                if e["personCode"] and medical:
+                    status[e["personCode"]] = {"status": e["status"], "note": e["note"]}
+
+    today = datetime.utcnow()
+    players = []
+    for pc, games in logs.items():
+        gp = len(games)
+        if gp < min_games:
+            continue
+        pirs = [p for _, _, p, _ in games]
+        secs = sum(s for *_, s in games)
+        avg = sum(pirs) / gp
+        sd = (sum((p - avg) ** 2 for p in pirs) / (gp - 1)) ** 0.5 if gp > 1 else 0.0
+        earlier = pirs[:-3]
+        last3 = sum(pirs[-3:]) / len(pirs[-3:])
+        image, pos, born = info.get(pc, (None, None, None))
+        club = clubs.get(games[-1][1])
+        before = prev.get(pc)
+        players.append({
+            "playerCode": pc,
+            "name": games[-1][0],
+            "imageUrl": image,
+            "position": pos,
+            "age": int((today - born).days // 365.25) if born else None,
+            "clubCode": club.code if club else games[-1][1],
+            "clubName": club.name if club else None,
+            "clubCrest": club.crest_url if club else None,
+            "gamesPlayed": gp,
+            "minutes": round(secs / 60 / gp, 1),
+            "pir": round(avg, 1),
+            "sd": round(sd, 1),
+            "cv": round(sd / avg, 2) if avg > 0 and gp > 2 else None,
+            "floor": round(avg - sd, 1),
+            "ceiling": round(avg + sd, 1),
+            "best": max(pirs),
+            "worst": min(pirs),
+            "pirPerMin": round(sum(pirs) / (secs / 60), 2) if secs else None,
+            "last3": round(last3, 1),
+            "form": round(last3 - sum(earlier) / len(earlier), 1) if len(earlier) >= 2 else None,
+            "prevPir": round(before["pir"], 1) if before and before["gp"] >= 10 else None,
+            "prevMinutes": round(before["minutes"], 1) if before and before["gp"] >= 10 else None,
+            "newClub": bool(before and before["club"] != games[-1][1]),
+            "injury": status.get(pc),
+        })
+
+    def top(key, rows, n=5, reverse=True):
+        return sorted(rows, key=lambda p: p[key], reverse=reverse)[:n]
+
+    def card(key, label, sub, rows):
+        return {"key": key, "label": label, "sub": sub,
+                "players": [p["playerCode"] for p in rows]}
+
+    with_prev = [p for p in players if p["prevPir"] is not None]
+    watch = [
+        card("form", "Hot form", "last 3 games vs earlier games",
+             top("form", [p for p in players if p["form"] is not None and p["form"] > 0])),
+        card("pirUp", "Up on last season", "PIR change vs last season (10+ games)",
+             top("d", [{**p, "d": p["pir"] - p["prevPir"]} for p in with_prev
+                       if p["pir"] > p["prevPir"]])),
+        card("role", "Bigger role", "minutes change vs last season",
+             top("d", [{**p, "d": p["minutes"] - p["prevMinutes"]} for p in with_prev
+                       if p["minutes"] > p["prevMinutes"] + 3])),
+        card("young", "Under-23 standouts", "highest PIR, age 22 or younger, 10+ min",
+             top("pir", [p for p in players
+                         if p["age"] is not None and p["age"] < 23 and p["minutes"] >= 10])),
+    ]
+    players.sort(key=lambda p: -p["pir"])
+    return {"season": season, "minGames": min_games, "players": players, "watch": watch}
 
 
 HIGH_CATEGORIES = [

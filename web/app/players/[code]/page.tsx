@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import GameLogChart from "@/components/GameLogChart";
@@ -51,10 +52,12 @@ export default async function PlayerPage({
     <div>
       <div className="mb-6 flex items-center gap-4">
         {player.imageUrl && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
+          <Image
             src={player.imageUrl}
             alt=""
+            width={80}
+            height={80}
+            loading="eager"
             className="h-20 w-20 rounded-full border border-neutral-800 object-cover"
           />
         )}

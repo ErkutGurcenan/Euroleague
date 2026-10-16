@@ -14,6 +14,7 @@ web/out/
 *.sqlite3
 .env
 .env.local
+db/injuries.json
 
 # Editors / OS
 .vscode/
