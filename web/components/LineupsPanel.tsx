@@ -18,7 +18,8 @@ const SIZES = [
 
 function signed(n: number | null): string {
   if (n === null) return "–";
-  return `${n > 0 ? "+" : n < 0 ? "−" : ""}${Math.abs(n).toFixed(1)}`;
+  const r = Math.round(n * 10) / 10;
+  return `${r > 0 ? "+" : r < 0 ? "−" : ""}${Math.abs(r).toFixed(1)}`;
 }
 
 function netClass(n: number | null): string {

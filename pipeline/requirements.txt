@@ -2,3 +2,4 @@ SQLAlchemy>=2.0,<3
 requests>=2.31
 fastapi>=0.110
 uvicorn[standard]>=0.29
+numpy>=1.26,<2.1

@@ -11,6 +11,7 @@ from typing import Optional
 from sqlalchemy import (
     Boolean,
     DateTime,
+    Float,
     ForeignKey,
     Integer,
     String,
@@ -281,3 +282,41 @@ class StintCheck(Base):
     pm_within3: Mapped[int] = mapped_column(Integer)
     minutes_within30: Mapped[int] = mapped_column(Integer)  # within 30 s of official
     issues: Mapped[Optional[str]] = mapped_column(String(300))
+
+
+class PlayerImpact(Base):
+    """Adjusted plus/minus (ridge regression on stints, see impact.py):
+    points per 100 possessions a player adds on offence and defence,
+    relative to an average player, with standard errors."""
+
+    __tablename__ = "player_impact"
+    __table_args__ = (UniqueConstraint("season_code", "player_code"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    season_code: Mapped[str] = mapped_column(String(8), index=True)
+    player_code: Mapped[str] = mapped_column(String(16), index=True)
+    club_code: Mapped[Optional[str]] = mapped_column(String(8))  # club with most minutes
+    minutes: Mapped[float] = mapped_column(Float)
+    possessions: Mapped[float] = mapped_column(Float)
+    off: Mapped[float] = mapped_column(Float)
+    defense: Mapped[float] = mapped_column(Float)
+    total: Mapped[float] = mapped_column(Float)
+    off_se: Mapped[float] = mapped_column(Float)
+    def_se: Mapped[float] = mapped_column(Float)
+    total_se: Mapped[float] = mapped_column(Float)
+    prior_total: Mapped[float] = mapped_column(Float)  # starting point carried from earlier seasons
+
+
+class ImpactSeason(Base):
+    """Per-season fit details for player_impact, for transparency."""
+
+    __tablename__ = "impact_seasons"
+
+    season_code: Mapped[str] = mapped_column(String(8), primary_key=True)
+    lam: Mapped[float] = mapped_column(Float)  # ridge strength chosen by cross-validation
+    league_off: Mapped[float] = mapped_column(Float)  # points per 100 possessions, average
+    home_edge: Mapped[float] = mapped_column(Float)  # extra points per 100 for the home offence
+    cv_baseline: Mapped[float] = mapped_column(Float)  # held-out error without players
+    cv_model: Mapped[float] = mapped_column(Float)  # held-out error with players
+    players: Mapped[int] = mapped_column(Integer)
+    rows: Mapped[int] = mapped_column(Integer)

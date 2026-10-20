@@ -25,10 +25,12 @@ from euroleague_pipeline.models import (  # noqa: E402
     Club,
     Game,
     GameReferee,
+    ImpactSeason,
     LineupStint,
     PbpEvent,
     PersonStint,
     PlayerGameStat,
+    PlayerImpact,
     Shot,
     StandingRow,
     StintCheck,
@@ -2479,6 +2481,80 @@ def club_onoff(session, code: str, season: str) -> dict:
 def club_onoff_route(code: str, season: str = DEFAULT_SEASON) -> dict:
     with Session(engine) as session:
         return club_onoff(session, code.upper(), season)
+
+
+RANGE_Z = 1.645  # 90% range
+IMPACT_MIN_MINUTES = (500, 60)  # full-season minimum, floor; scaled by season progress
+
+
+def impact_dict(r: PlayerImpact) -> dict:
+    return {
+        "off": r.off, "def": r.defense, "total": r.total,
+        "offRange": round(RANGE_Z * r.off_se, 1), "defRange": round(RANGE_Z * r.def_se, 1),
+        "totalRange": round(RANGE_Z * r.total_se, 1),
+        "minutes": r.minutes, "start": r.prior_total,
+    }
+
+
+def impact_table(session, season: str) -> tuple[list[PlayerImpact], int]:
+    min_minutes = max(IMPACT_MIN_MINUTES[1], round(IMPACT_MIN_MINUTES[0] * season_progress(session, season)))
+    rows = session.execute(
+        select(PlayerImpact).where(PlayerImpact.season_code == season, PlayerImpact.minutes >= min_minutes)
+        .order_by(PlayerImpact.total.desc())
+    ).scalars().all()
+    return rows, min_minutes
+
+
+@app.get("/api/impact/adjusted")
+def adjusted_impact(season: str = DEFAULT_SEASON) -> dict:
+    """League leaderboard of adjusted plus/minus (see pipeline impact.py)."""
+    with Session(engine) as session:
+        rows, min_minutes = impact_table(session, season)
+        fit = session.get(ImpactSeason, season)
+        clubs = load_clubs(session)
+        names = {pc: short_name(n) for pc, n in session.execute(
+            select(PlayerGameStat.player_code, func.max(PlayerGameStat.player_name))
+            .where(PlayerGameStat.season_code == season).group_by(PlayerGameStat.player_code))}
+        return {
+            "season": season,
+            "minMinutes": min_minutes,
+            "homeEdge": fit.home_edge if fit else None,
+            "players": [
+                {"rank": i, "playerCode": r.player_code, "name": names.get(r.player_code, r.player_code),
+                 **club_badge(clubs, r.club_code), **impact_dict(r)}
+                for i, r in enumerate(rows, 1)
+            ],
+        }
+
+
+@app.get("/api/players/{player_code}/impact")
+def player_impact(player_code: str, season: str = DEFAULT_SEASON) -> dict:
+    """A player's adjusted plus/minus this season (with league rank) and by season."""
+    with Session(engine) as session:
+        history = session.execute(
+            select(PlayerImpact).where(PlayerImpact.player_code == player_code)
+            .order_by(PlayerImpact.season_code.desc())
+        ).scalars().all()
+        clubs = load_clubs(session)
+        current = next((r for r in history if r.season_code == season), None)
+        rank = qualified = None
+        min_minutes = None
+        if current:
+            rows, min_minutes = impact_table(session, season)
+            qualified = len(rows)
+            rank = next((i for i, r in enumerate(rows, 1) if r.player_code == player_code), None)
+        return {
+            "season": season,
+            "playerCode": player_code,
+            "current": ({**impact_dict(current), **club_badge(clubs, current.club_code),
+                         "rank": rank, "qualified": qualified, "minMinutes": min_minutes}
+                        if current else None),
+            "history": [
+                {"season": r.season_code, "seasonLabel": season_label(r.season_code),
+                 **club_badge(clubs, r.club_code), **impact_dict(r)}
+                for r in history
+            ],
+        }
 
 
 @app.get("/api/impact")
