@@ -3,8 +3,9 @@ import { notFound } from "next/navigation";
 import Headshot from "@/components/Headshot";
 import HeadToHead from "@/components/HeadToHead";
 import { appliesToRound, isMedical, StatusPill, timeline } from "@/components/InjuryStatus";
+import RotationChart from "@/components/RotationChart";
 import ShotChart from "@/components/ShotChart";
-import { getGame, getHeadToHead, getInjuries, type GameDetailSide } from "@/lib/api";
+import { getGame, getHeadToHead, getInjuries, getRotation, type GameDetailSide } from "@/lib/api";
 import { currentSeason } from "@/lib/season";
 
 function BoxScoreTable({ side }: { side: GameDetailSide }) {
@@ -147,6 +148,10 @@ export async function generateMetadata({
   }
 }
 
+function startsWithinDays(utcDate: string | null, days: number): boolean {
+  return !!utcDate && new Date(utcDate).getTime() - Date.now() < days * 24 * 3600 * 1000;
+}
+
 export default async function GamePage({
   params,
 }: {
@@ -161,15 +166,13 @@ export default async function GamePage({
   }
   const { home, away } = game;
   // A current injury report says little about games weeks away.
-  const soon =
-    !game.played &&
-    !!game.utcDate &&
-    new Date(game.utcDate).getTime() - Date.now() < 14 * 24 * 3600 * 1000;
-  const [h2h, injuryReport] = await Promise.all([
+  const soon = !game.played && startsWithinDays(game.utcDate, 14);
+  const [h2h, injuryReport, rotation] = await Promise.all([
     home.club && away.club
       ? getHeadToHead(home.club.code, away.club.code).catch(() => null)
       : null,
     soon ? getInjuries().catch(() => null) : null,
+    game.played ? getRotation(game.gameCode, game.season).catch(() => null) : null,
   ]);
   const unavailable =
     injuryReport && injuryReport.season === game.season
@@ -322,6 +325,13 @@ export default async function GamePage({
 
           <BoxScoreTable side={home} />
           <BoxScoreTable side={away} />
+
+          {rotation && rotation.available && (
+            <>
+              <h2 className="mb-3 text-lg font-semibold">Rotation</h2>
+              <RotationChart rotation={rotation} />
+            </>
+          )}
 
           {(home.shots.length > 0 || away.shots.length > 0) && (
             <>

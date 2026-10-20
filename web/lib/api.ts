@@ -637,6 +637,38 @@ export function getFantasy(season?: string) {
   }>(`/api/fantasy${qs({ season })}`);
 }
 
+export type RotationPlayer = {
+  playerCode: string;
+  name: string;
+  starter: boolean;
+  segments: [number, number][];
+  plusMinus: number;
+  seconds: number;
+};
+
+export type RotationTeam = {
+  code: string;
+  name: string;
+  crestUrl: string | null;
+  players: RotationPlayer[];
+};
+
+export type Rotation =
+  | { available: false }
+  | {
+      available: true;
+      usable: boolean;
+      length: number;
+      periods: number[];
+      home: RotationTeam;
+      away: RotationTeam;
+      stints: { start: number; end: number; homeNet: number; valid: boolean }[];
+    };
+
+export function getRotation(gameCode: number, season?: string) {
+  return get<Rotation>(`/api/games/${gameCode}/rotation${qs({ season })}`);
+}
+
 export function getMeta() {
   return get<{
     seasons: number;

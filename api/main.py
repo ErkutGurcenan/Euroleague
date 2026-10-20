@@ -24,11 +24,13 @@ from euroleague_pipeline.models import (  # noqa: E402
     Club,
     Game,
     GameReferee,
+    LineupStint,
     PbpEvent,
     PersonStint,
     PlayerGameStat,
     Shot,
     StandingRow,
+    StintCheck,
 )
 
 DB_PATH = REPO_ROOT / "db" / "euroleague.db"
@@ -943,6 +945,79 @@ def notable_games(season: str = DEFAULT_SEASON, limit: int = 8) -> dict:
                         for g in sorted(games, key=total, reverse=True)[:limit]
                     ],
                 },
+            ],
+        }
+
+
+@app.get("/api/games/{game_code}/rotation")
+def game_rotation(game_code: int, season: str = DEFAULT_SEASON) -> dict:
+    """Who was on court when, rebuilt from the play-by-play (see stints.py)."""
+    with Session(engine) as session:
+        game = session.execute(
+            select(Game).where(Game.season_code == season, Game.game_code == game_code)
+        ).scalar_one_or_none()
+        if game is None:
+            raise HTTPException(404, "game not found")
+        check = session.execute(
+            select(StintCheck).where(StintCheck.season_code == season, StintCheck.game_code == game_code)
+        ).scalar_one_or_none()
+        stints = session.execute(
+            select(LineupStint)
+            .where(LineupStint.season_code == season, LineupStint.game_code == game_code)
+            .order_by(LineupStint.stint_no)
+        ).scalars().all()
+        if not stints or check is None:
+            return {"available": False}
+        clubs = load_clubs(session)
+        box = {
+            pc: (name, club, starter, secs)
+            for pc, name, club, starter, secs in session.execute(
+                select(PlayerGameStat.player_code, PlayerGameStat.player_name, PlayerGameStat.club_code,
+                       PlayerGameStat.is_starter, PlayerGameStat.seconds_played)
+                .where(PlayerGameStat.season_code == season, PlayerGameStat.game_code == game_code)
+            )
+        }
+
+        sides = {"home": {}, "away": {}}
+        for st in stints:
+            net = st.home_pts - st.away_pts
+            for side, lineup, sign in (("home", st.home_lineup, 1), ("away", st.away_lineup, -1)):
+                for pc in lineup.split("|"):
+                    p = sides[side].setdefault(pc, {"segments": [], "plusMinus": 0, "seconds": 0})
+                    p["plusMinus"] += sign * net
+                    p["seconds"] += st.end_sec - st.start_sec
+                    segs = p["segments"]
+                    if segs and segs[-1][1] == st.start_sec:
+                        segs[-1][1] = st.end_sec
+                    else:
+                        segs.append([st.start_sec, st.end_sec])
+
+        def team(side: str, code: str) -> dict:
+            club = clubs.get(code)
+            players = []
+            for pc, p in sides[side].items():
+                if pc not in box:
+                    continue
+                name, _, starter, _ = box[pc]
+                players.append({"playerCode": pc, "name": name, "starter": bool(starter), **p})
+            players.sort(key=lambda p: (not p["starter"], -p["seconds"]))
+            return {"code": code, "name": club.name if club else code,
+                    "crestUrl": club.crest_url if club else None, "players": players}
+
+        length = stints[-1].end_sec
+        periods = [t for t in (600, 1200, 1800) if t < length]
+        periods += list(range(2400, length, 300))
+        return {
+            "available": True,
+            "usable": check.usable,
+            "length": length,
+            "periods": periods,
+            "home": team("home", game.local_club_code),
+            "away": team("away", game.road_club_code),
+            "stints": [
+                {"start": st.start_sec, "end": st.end_sec, "homeNet": st.home_pts - st.away_pts,
+                 "valid": st.valid}
+                for st in stints
             ],
         }
 
