@@ -694,6 +694,56 @@ export function getClubLineups(code: string, season?: string) {
   return get<ClubLineups>(`/api/clubs/${code}/lineups${qs({ season })}`);
 }
 
+export type OnOffSide = {
+  minutes: number;
+  possessions: number;
+  offRating: number | null;
+  defRating: number | null;
+  netRating: number | null;
+};
+
+export type OnOffRow = {
+  playerCode: string;
+  name: string;
+  games: number;
+  on: OnOffSide;
+  off: OnOffSide;
+  swing: number | null;
+  qualified: boolean;
+  smallSample: boolean;
+  rank?: number;
+};
+
+export type ClubOnOff = {
+  season: string;
+  club: string;
+  minOnMinutes: number;
+  minOffMinutes: number;
+  team: { minutes: number; offRating: number | null; defRating: number | null; netRating: number | null };
+  qualified: number;
+  players: OnOffRow[];
+};
+
+export type PlayerOnOffEntry = OnOffRow & {
+  club: string;
+  clubName: string;
+  clubCrest: string | null;
+  team: ClubOnOff["team"];
+  qualifiedPlayers: number;
+  minOnMinutes: number;
+  minOffMinutes: number;
+};
+
+export function getClubOnOff(code: string, season?: string) {
+  return get<ClubOnOff>(`/api/clubs/${code}/onoff${qs({ season })}`);
+}
+
+export function getPlayerOnOff(code: string, season?: string) {
+  return get<{ season: string; playerCode: string; entries: PlayerOnOffEntry[] }>(
+    `/api/players/${code}/onoff${qs({ season })}`,
+  );
+}
+
 export function getMeta() {
   return get<{
     seasons: number;

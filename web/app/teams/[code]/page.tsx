@@ -6,7 +6,8 @@ import Headshot from "@/components/Headshot";
 import { isMedical, StatusPill } from "@/components/InjuryStatus";
 import ShotChartExplorer from "@/components/ShotChartExplorer";
 import LineupsPanel from "@/components/LineupsPanel";
-import { getClub, getClubHistory, getClubLineups, getClubShots, getInjuries } from "@/lib/api";
+import { OnOffRanking } from "@/components/OnOff";
+import { getClub, getClubHistory, getClubLineups, getClubOnOff, getClubShots, getInjuries } from "@/lib/api";
 import { currentSeason } from "@/lib/season";
 
 function age(birthDate: string | null): string {
@@ -40,14 +41,15 @@ export default async function TeamPage({
 }) {
   const { code } = await params;
   const season = await currentSeason();
-  let data, shotData, history, injuryReport, lineups;
+  let data, shotData, history, injuryReport, lineups, onoff;
   try {
-    [data, shotData, history, injuryReport, lineups] = await Promise.all([
+    [data, shotData, history, injuryReport, lineups, onoff] = await Promise.all([
       getClub(code.toUpperCase(), season),
       getClubShots(code.toUpperCase(), season),
       getClubHistory(code.toUpperCase()).catch(() => null),
       getInjuries().catch(() => null),
       getClubLineups(code.toUpperCase(), season).catch(() => null),
+      getClubOnOff(code.toUpperCase(), season).catch(() => null),
     ]);
   } catch {
     notFound();
@@ -283,6 +285,15 @@ export default async function TeamPage({
           <h2 className="mb-3 text-lg font-semibold">Lineups</h2>
           <div className="mb-8">
             <LineupsPanel data={lineups} />
+          </div>
+        </>
+      )}
+
+      {onoff && onoff.players.length > 0 && (
+        <>
+          <h2 className="mb-3 text-lg font-semibold">Player impact (on/off)</h2>
+          <div className="mb-8">
+            <OnOffRanking data={onoff} />
           </div>
         </>
       )}

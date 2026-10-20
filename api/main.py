@@ -2213,6 +2213,51 @@ def possessions(fga: int, fta: int, oreb: int, tov: int) -> float:
     return fga + 0.44 * fta - oreb + tov
 
 
+def club_stints(session, code: str, season: str) -> list[tuple]:
+    """Valid stints of usable games for a club, from its side of the floor:
+    (game_code, players, points for, points against, possessions, seconds).
+    Possessions average both teams' estimates to reduce noise."""
+    rows = session.execute(
+        select(LineupStint)
+        .join(StintCheck, (StintCheck.season_code == LineupStint.season_code)
+              & (StintCheck.game_code == LineupStint.game_code))
+        .where(LineupStint.season_code == season, LineupStint.valid, StintCheck.usable,
+               or_(LineupStint.home_club == code, LineupStint.away_club == code))
+    ).scalars().all()
+    out = []
+    for st in rows:
+        side, opp = ("home", "away") if st.home_club == code else ("away", "home")
+        own = possessions(*(getattr(st, f"{side}_{k}") for k in ("fga", "fta", "oreb", "tov")))
+        other = possessions(*(getattr(st, f"{opp}_{k}") for k in ("fga", "fta", "oreb", "tov")))
+        out.append((
+            st.game_code,
+            getattr(st, f"{side}_lineup").split("|"),
+            getattr(st, f"{side}_pts"),
+            getattr(st, f"{opp}_pts"),
+            (own + other) / 2,
+            st.end_sec - st.start_sec,
+        ))
+    return out
+
+
+def club_player_names(session, code: str, season: str) -> dict[str, str]:
+    return {
+        pc: short_name(n)
+        for pc, n in session.execute(
+            select(PlayerGameStat.player_code, func.max(PlayerGameStat.player_name))
+            .where(PlayerGameStat.season_code == season, PlayerGameStat.club_code == code)
+            .group_by(PlayerGameStat.player_code)
+        )
+    }
+
+
+def ratings(pf: float, pa: float, poss: float) -> dict:
+    if poss <= 0:
+        return {"offRating": None, "defRating": None, "netRating": None}
+    off, deff = 100 * pf / poss, 100 * pa / poss
+    return {"offRating": round(off, 1), "defRating": round(deff, 1), "netRating": round(off - deff, 1)}
+
+
 @app.get("/api/clubs/{code}/lineups")
 def club_lineups(code: str, season: str = DEFAULT_SEASON) -> dict:
     """Five-, three- and two-player combinations for a team: minutes together
@@ -2220,39 +2265,17 @@ def club_lineups(code: str, season: str = DEFAULT_SEASON) -> dict:
     usable games (see stints.py)."""
     code = code.upper()
     with Session(engine) as session:
-        stints = session.execute(
-            select(LineupStint)
-            .join(StintCheck, (StintCheck.season_code == LineupStint.season_code)
-                  & (StintCheck.game_code == LineupStint.game_code))
-            .where(LineupStint.season_code == season, LineupStint.valid, StintCheck.usable,
-                   or_(LineupStint.home_club == code, LineupStint.away_club == code))
-        ).scalars().all()
-        names = {
-            pc: short_name(n)
-            for pc, n in session.execute(
-                select(PlayerGameStat.player_code, func.max(PlayerGameStat.player_name))
-                .where(PlayerGameStat.season_code == season, PlayerGameStat.club_code == code)
-                .group_by(PlayerGameStat.player_code)
-            )
-        }
+        stints = club_stints(session, code, season)
+        names = club_player_names(session, code, season)
         progress = season_progress(session, season)
 
     agg = {size: {} for size in LINEUP_MIN_MINUTES}
     team = {"sec": 0, "pf": 0, "pa": 0, "poss": 0.0}
     games = set()
-    for st in stints:
-        home = st.home_club == code
-        lineup = st.home_lineup if home else st.away_lineup
-        side, opp = ("home", "away") if home else ("away", "home")
-        pf, pa = getattr(st, f"{side}_pts"), getattr(st, f"{opp}_pts")
-        own = possessions(*(getattr(st, f"{side}_{k}") for k in ("fga", "fta", "oreb", "tov")))
-        other = possessions(*(getattr(st, f"{opp}_{k}") for k in ("fga", "fta", "oreb", "tov")))
-        poss = (own + other) / 2
-        sec = st.end_sec - st.start_sec
-        games.add(st.game_code)
+    for game, players, pf, pa, poss, sec in stints:
+        games.add(game)
         for k, v in (("sec", sec), ("pf", pf), ("pa", pa), ("poss", poss)):
             team[k] += v
-        players = lineup.split("|")
         for size in agg:
             for combo in combinations(players, size):
                 a = agg[size].setdefault(combo, {"sec": 0, "pf": 0, "pa": 0, "poss": 0.0, "games": set()})
@@ -2260,13 +2283,7 @@ def club_lineups(code: str, season: str = DEFAULT_SEASON) -> dict:
                 a["pf"] += pf
                 a["pa"] += pa
                 a["poss"] += poss
-                a["games"].add(st.game_code)
-
-    def ratings(pf: int, pa: int, poss: float) -> dict:
-        if poss <= 0:
-            return {"offRating": None, "defRating": None, "netRating": None}
-        off, deff = 100 * pf / poss, 100 * pa / poss
-        return {"offRating": round(off, 1), "defRating": round(deff, 1), "netRating": round(off - deff, 1)}
+                a["games"].add(game)
 
     sizes = {}
     for size, combos in agg.items():
@@ -2300,6 +2317,111 @@ def club_lineups(code: str, season: str = DEFAULT_SEASON) -> dict:
         "team": {"minutes": round(team["sec"] / 60), **ratings(team["pf"], team["pa"], team["poss"])},
         "sizes": sizes,
     }
+
+
+# Full-season minimums (34 games) for on/off, scaled by season progress.
+ONOFF_MIN_ON = (300, 20)
+ONOFF_MIN_OFF = (100, 10)
+
+
+def club_onoff(session, code: str, season: str) -> dict:
+    """On/off for every player of a club: team ratings with him on court vs on
+    the bench, counting only games he played in (a missed game means a
+    different rotation, which would muddy the comparison)."""
+    stints = club_stints(session, code, season)
+    names = club_player_names(session, code, season)
+    progress = season_progress(session, season)
+    min_on = max(ONOFF_MIN_ON[1], round(ONOFF_MIN_ON[0] * progress))
+    min_off = max(ONOFF_MIN_OFF[1], round(ONOFF_MIN_OFF[0] * progress))
+
+    games_of: dict[str, set] = {}
+    for game, players, *_ in stints:
+        for pc in players:
+            games_of.setdefault(pc, set()).add(game)
+
+    team = {"pf": 0, "pa": 0, "poss": 0.0, "sec": 0}
+    for _, _, pf, pa, poss, sec in stints:
+        team["pf"] += pf
+        team["pa"] += pa
+        team["poss"] += poss
+        team["sec"] += sec
+
+    rows = []
+    for pc, games in games_of.items():
+        on = {"pf": 0, "pa": 0, "poss": 0.0, "sec": 0}
+        off = {"pf": 0, "pa": 0, "poss": 0.0, "sec": 0}
+        for game, players, pf, pa, poss, sec in stints:
+            if game not in games:
+                continue
+            bucket = on if pc in players else off
+            bucket["pf"] += pf
+            bucket["pa"] += pa
+            bucket["poss"] += poss
+            bucket["sec"] += sec
+        on_r = ratings(on["pf"], on["pa"], on["poss"])
+        off_r = ratings(off["pf"], off["pa"], off["poss"])
+        on_min, off_min = on["sec"] / 60, off["sec"] / 60
+        swing = (round(on_r["netRating"] - off_r["netRating"], 1)
+                 if on_r["netRating"] is not None and off_r["netRating"] is not None else None)
+        rows.append({
+            "playerCode": pc,
+            "name": names.get(pc, pc),
+            "games": len(games),
+            "on": {"minutes": round(on_min, 1), "possessions": round(on["poss"]), **on_r},
+            "off": {"minutes": round(off_min, 1), "possessions": round(off["poss"]), **off_r},
+            "swing": swing,
+            "qualified": on_min >= min_on and off_min >= min_off,
+            "smallSample": on_min < 2 * min_on or off_min < 2 * min_off,
+        })
+    ranked = sorted((r for r in rows if r["qualified"] and r["swing"] is not None), key=lambda r: -r["swing"])
+    for i, r in enumerate(ranked, 1):
+        r["rank"] = i
+    return {
+        "season": season,
+        "club": code,
+        "minOnMinutes": min_on,
+        "minOffMinutes": min_off,
+        "team": {"minutes": round(team["sec"] / 60), **ratings(team["pf"], team["pa"], team["poss"])},
+        "qualified": len(ranked),
+        "players": ranked + sorted((r for r in rows if r not in ranked), key=lambda r: -r["on"]["minutes"]),
+    }
+
+
+@app.get("/api/clubs/{code}/onoff")
+def club_onoff_route(code: str, season: str = DEFAULT_SEASON) -> dict:
+    with Session(engine) as session:
+        return club_onoff(session, code.upper(), season)
+
+
+@app.get("/api/players/{player_code}/onoff")
+def player_onoff(player_code: str, season: str = DEFAULT_SEASON) -> dict:
+    """On/off for one player, per club he played for this season (most minutes first)."""
+    with Session(engine) as session:
+        clubs = session.execute(
+            select(PlayerGameStat.club_code, func.sum(PlayerGameStat.seconds_played))
+            .where(PlayerGameStat.season_code == season, PlayerGameStat.player_code == player_code)
+            .group_by(PlayerGameStat.club_code)
+            .order_by(func.sum(PlayerGameStat.seconds_played).desc())
+        ).all()
+        club_info = load_clubs(session)
+        entries = []
+        for code, _ in clubs:
+            data = club_onoff(session, code, season)
+            row = next((r for r in data["players"] if r["playerCode"] == player_code), None)
+            if row is None:
+                continue
+            club = club_info.get(code)
+            entries.append({
+                "club": code,
+                "clubName": club.name if club else code,
+                "clubCrest": club.crest_url if club else None,
+                "team": data["team"],
+                "qualifiedPlayers": data["qualified"],
+                "minOnMinutes": data["minOnMinutes"],
+                "minOffMinutes": data["minOffMinutes"],
+                **row,
+            })
+        return {"season": season, "playerCode": player_code, "entries": entries}
 
 
 @app.get("/api/clubs/{code}")
