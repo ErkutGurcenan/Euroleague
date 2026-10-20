@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { ClubOnOff, PlayerOnOffEntry } from "@/lib/api";
+import type { OnOffRow, PlayerOnOffEntry } from "@/lib/api";
 
 export const ONOFF_NOTE =
   "On/off compares how the team did per 100 possessions with the player on the court and on the bench, in games he played. It depends on teammates and opponents: starters often face the other team's best players, and a strong bench lifts the off-court numbers.";
@@ -18,10 +18,19 @@ function ordinal(n: number): string {
   return `${n}${s}`;
 }
 
-/** Team page: players ranked by on/off swing, with a diverging bar. */
-export function OnOffRanking({ data }: { data: ClubOnOff }) {
-  const ranked = data.players.filter((p) => p.rank !== undefined);
-  const unranked = data.players.length - ranked.length;
+type RankingData = {
+  players: OnOffRow[];
+  minOnMinutes: number;
+  minOffMinutes: number;
+  unranked?: number;
+};
+
+/** Players ranked by on/off swing with a diverging bar (team or league). */
+export function OnOffRanking({ data, limit }: { data: RankingData; limit?: number }) {
+  const allRanked = data.players.filter((p) => p.rank !== undefined);
+  const ranked = limit ? allRanked.slice(0, limit) : allRanked;
+  const unranked = data.unranked ?? data.players.length - allRanked.length;
+  const league = ranked.some((p) => p.clubCode);
   const scale = Math.max(10, ...ranked.map((p) => Math.abs(p.swing ?? 0)));
   return (
     <div className="grid gap-3">
@@ -31,6 +40,7 @@ export function OnOffRanking({ data }: { data: ClubOnOff }) {
             <tr>
               <th className="px-3 py-2">#</th>
               <th className="px-3 py-2">Player</th>
+              {league && <th className="px-3 py-2">Team</th>}
               <th className="px-2 py-2 text-right">On min</th>
               <th className="px-2 py-2 text-right">Net on</th>
               <th className="px-2 py-2 text-right">Net off</th>
@@ -40,7 +50,7 @@ export function OnOffRanking({ data }: { data: ClubOnOff }) {
           <tbody>
             {ranked.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-3 py-4 text-center text-neutral-500">
+                <td colSpan={league ? 7 : 6} className="px-3 py-4 text-center text-neutral-500">
                   No player has enough minutes on and off the court yet.
                 </td>
               </tr>
@@ -48,7 +58,7 @@ export function OnOffRanking({ data }: { data: ClubOnOff }) {
             {ranked.map((p) => {
               const w = (Math.min(Math.abs(p.swing ?? 0), scale) / scale) * 50;
               return (
-                <tr key={p.playerCode} className="border-t border-neutral-800/60 hover:bg-neutral-900/60">
+                <tr key={`${p.clubCode ?? ""}:${p.playerCode}`} className="border-t border-neutral-800/60 hover:bg-neutral-900/60">
                   <td className="px-3 py-2 text-neutral-500">{p.rank}</td>
                   <td className="px-3 py-2">
                     <Link href={`/players/${p.playerCode}`} className="hover:text-orange-400">
@@ -58,6 +68,17 @@ export function OnOffRanking({ data }: { data: ClubOnOff }) {
                       <span className="ml-2 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10.5px] text-amber-300">small sample</span>
                     )}
                   </td>
+                  {league && (
+                    <td className="px-3 py-2">
+                      <Link href={`/teams/${p.clubCode}`} className="inline-flex items-center gap-1.5 text-neutral-400 hover:text-white" title={p.clubName}>
+                        {p.clubCrest && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={p.clubCrest} alt="" className="h-4 w-4 object-contain" />
+                        )}
+                        {p.clubCode}
+                      </Link>
+                    </td>
+                  )}
                   <td className="px-2 py-2 text-right tabular-nums text-neutral-400">{p.on.minutes.toFixed(0)}</td>
                   <td className={`px-2 py-2 text-right tabular-nums ${tone(p.on.netRating)}`}>{signed(p.on.netRating)}</td>
                   <td className={`px-2 py-2 text-right tabular-nums ${tone(p.off.netRating)}`}>{signed(p.off.netRating)}</td>
@@ -81,7 +102,8 @@ export function OnOffRanking({ data }: { data: ClubOnOff }) {
       </div>
       <p className="text-xs text-neutral-500">
         {ONOFF_NOTE} Ranked players need {data.minOnMinutes}+ minutes on and {data.minOffMinutes}+ off
-        {unranked > 0 ? `; ${unranked} below that aren't ranked` : ""}.
+        {unranked > 0 ? `; ${unranked} below that aren't ranked` : ""}
+        {limit && allRanked.length > ranked.length ? `. Showing the top ${ranked.length} of ${allRanked.length}` : ""}.
       </p>
     </div>
   );

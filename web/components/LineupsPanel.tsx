@@ -4,6 +4,12 @@ import Link from "next/link";
 import { useState } from "react";
 import type { ClubLineups, LineupRow } from "@/lib/api";
 
+type LineupsData = {
+  games: number;
+  team?: ClubLineups["team"];
+  sizes: Record<"5" | "3" | "2", { minMinutes: number; rows: LineupRow[] }>;
+};
+
 const SIZES = [
   { key: "5", label: "5-man" },
   { key: "3", label: "3-man" },
@@ -19,14 +25,16 @@ function netClass(n: number | null): string {
   return n === null ? "text-neutral-500" : n > 0 ? "text-emerald-400" : n < 0 ? "text-red-400" : "text-neutral-300";
 }
 
-export default function LineupsPanel({ data }: { data: ClubLineups }) {
+export default function LineupsPanel({ data }: { data: LineupsData }) {
   const [size, setSize] = useState<"5" | "3" | "2">("5");
   const [sort, setSort] = useState<"minutes" | "net">("minutes");
   const block = data.sizes[size];
-  const rows: LineupRow[] =
+  const rows: LineupRow[] = (
     sort === "minutes"
       ? block.rows
-      : [...block.rows].sort((a, b) => (b.netRating ?? -999) - (a.netRating ?? -999));
+      : [...block.rows].sort((a, b) => (b.netRating ?? -999) - (a.netRating ?? -999))
+  ).slice(0, 25);
+  const league = rows.some((r) => r.clubCode);
   const toggle = (active: boolean) =>
     `px-3 py-1 text-xs transition-colors ${active ? "bg-orange-600 text-white" : "text-neutral-400 hover:text-white"}`;
 
@@ -49,7 +57,7 @@ export default function LineupsPanel({ data }: { data: ClubLineups }) {
           </button>
         </span>
         <span className="ml-auto text-xs text-neutral-500">
-          min. {block.minMinutes} minutes together · {data.games} games
+          min. {block.minMinutes} minutes together · {data.games} games{league ? " · all teams" : ""}
         </span>
       </div>
 
@@ -66,14 +74,16 @@ export default function LineupsPanel({ data }: { data: ClubLineups }) {
             </tr>
           </thead>
           <tbody>
-            <tr className="border-t border-neutral-800/60 bg-neutral-900/50 text-neutral-400">
-              <td className="px-3 py-2 italic">Whole team</td>
-              <td className="px-2 py-2 text-right tabular-nums">{data.team.minutes}</td>
-              <td className="px-2 py-2 text-right">–</td>
-              <td className="px-2 py-2 text-right tabular-nums">{data.team.offRating?.toFixed(1) ?? "–"}</td>
-              <td className="px-2 py-2 text-right tabular-nums">{data.team.defRating?.toFixed(1) ?? "–"}</td>
-              <td className={`px-3 py-2 text-right tabular-nums ${netClass(data.team.netRating)}`}>{signed(data.team.netRating)}</td>
-            </tr>
+            {data.team && (
+              <tr className="border-t border-neutral-800/60 bg-neutral-900/50 text-neutral-400">
+                <td className="px-3 py-2 italic">Whole team</td>
+                <td className="px-2 py-2 text-right tabular-nums">{data.team.minutes}</td>
+                <td className="px-2 py-2 text-right">–</td>
+                <td className="px-2 py-2 text-right tabular-nums">{data.team.offRating?.toFixed(1) ?? "–"}</td>
+                <td className="px-2 py-2 text-right tabular-nums">{data.team.defRating?.toFixed(1) ?? "–"}</td>
+                <td className={`px-3 py-2 text-right tabular-nums ${netClass(data.team.netRating)}`}>{signed(data.team.netRating)}</td>
+              </tr>
+            )}
             {rows.length === 0 && (
               <tr className="border-t border-neutral-800/60">
                 <td colSpan={6} className="px-3 py-4 text-center text-neutral-500">
@@ -82,9 +92,18 @@ export default function LineupsPanel({ data }: { data: ClubLineups }) {
               </tr>
             )}
             {rows.map((r) => (
-              <tr key={r.players.map((p) => p.playerCode).join("|")} className="border-t border-neutral-800/60 hover:bg-neutral-900/60">
+              <tr key={`${r.clubCode ?? ""}:${r.players.map((p) => p.playerCode).join("|")}`} className="border-t border-neutral-800/60 hover:bg-neutral-900/60">
                 <td className="px-3 py-2">
                   <span className="inline-flex flex-wrap items-center gap-x-1">
+                    {r.clubCode && (
+                      <Link href={`/teams/${r.clubCode}`} className="mr-1.5 inline-flex items-center gap-1 text-xs text-neutral-500 hover:text-white" title={r.clubName}>
+                        {r.clubCrest && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={r.clubCrest} alt="" className="h-4 w-4 object-contain" />
+                        )}
+                        {r.clubCode}
+                      </Link>
+                    )}
                     {r.players.map((p, i) => (
                       <span key={p.playerCode}>
                         <Link href={`/players/${p.playerCode}`} className="hover:text-orange-400">
@@ -110,8 +129,9 @@ export default function LineupsPanel({ data }: { data: ClubLineups }) {
       </div>
       <p className="text-xs text-neutral-500">
         Off and Def are points scored and allowed per 100 possessions while the group was on court;
-        Net is the difference. Possessions are estimated from the play-by-play. Compare each group
-        with the whole-team row. Groups with under {2 * block.minMinutes} minutes are marked as small samples.
+        Net is the difference. Possessions are estimated from the play-by-play.
+        {data.team ? " Compare each group with the whole-team row." : " League average net rating is 0."}{" "}
+        Groups with under {2 * block.minMinutes} minutes are marked as small samples.
       </p>
     </div>
   );

@@ -2213,42 +2213,57 @@ def possessions(fga: int, fta: int, oreb: int, tov: int) -> float:
     return fga + 0.44 * fta - oreb + tov
 
 
-def club_stints(session, code: str, season: str) -> list[tuple]:
-    """Valid stints of usable games for a club, from its side of the floor:
-    (game_code, players, points for, points against, possessions, seconds).
-    Possessions average both teams' estimates to reduce noise."""
-    rows = session.execute(
+def side_stints(session, season: str, club: Optional[str] = None) -> dict[str, list[tuple]]:
+    """Valid stints of usable games, from each club's side of the floor:
+    club -> [(game_code, players, points for, points against, possessions,
+    seconds)]. Possessions average both teams' estimates to reduce noise."""
+    q = (
         select(LineupStint)
         .join(StintCheck, (StintCheck.season_code == LineupStint.season_code)
               & (StintCheck.game_code == LineupStint.game_code))
-        .where(LineupStint.season_code == season, LineupStint.valid, StintCheck.usable,
-               or_(LineupStint.home_club == code, LineupStint.away_club == code))
-    ).scalars().all()
-    out = []
-    for st in rows:
-        side, opp = ("home", "away") if st.home_club == code else ("away", "home")
-        own = possessions(*(getattr(st, f"{side}_{k}") for k in ("fga", "fta", "oreb", "tov")))
-        other = possessions(*(getattr(st, f"{opp}_{k}") for k in ("fga", "fta", "oreb", "tov")))
-        out.append((
-            st.game_code,
-            getattr(st, f"{side}_lineup").split("|"),
-            getattr(st, f"{side}_pts"),
-            getattr(st, f"{opp}_pts"),
-            (own + other) / 2,
-            st.end_sec - st.start_sec,
-        ))
+        .where(LineupStint.season_code == season, LineupStint.valid, StintCheck.usable)
+    )
+    if club:
+        q = q.where(or_(LineupStint.home_club == club, LineupStint.away_club == club))
+    out: dict[str, list[tuple]] = {}
+    for st in session.execute(q).scalars():
+        poss = {
+            side: possessions(*(getattr(st, f"{side}_{k}") for k in ("fga", "fta", "oreb", "tov")))
+            for side in ("home", "away")
+        }
+        avg = (poss["home"] + poss["away"]) / 2
+        sec = st.end_sec - st.start_sec
+        for side, opp, code in (("home", "away", st.home_club), ("away", "home", st.away_club)):
+            if club and code != club:
+                continue
+            out.setdefault(code, []).append((
+                st.game_code,
+                getattr(st, f"{side}_lineup").split("|"),
+                getattr(st, f"{side}_pts"),
+                getattr(st, f"{opp}_pts"),
+                avg,
+                sec,
+            ))
     return out
 
 
-def club_player_names(session, code: str, season: str) -> dict[str, str]:
-    return {
-        pc: short_name(n)
-        for pc, n in session.execute(
-            select(PlayerGameStat.player_code, func.max(PlayerGameStat.player_name))
-            .where(PlayerGameStat.season_code == season, PlayerGameStat.club_code == code)
-            .group_by(PlayerGameStat.player_code)
-        )
-    }
+def club_stints(session, code: str, season: str) -> list[tuple]:
+    return side_stints(session, season, code).get(code, [])
+
+
+def season_player_names(session, season: str, club: Optional[str] = None) -> dict[str, dict[str, str]]:
+    """club -> player code -> short display name."""
+    q = (
+        select(PlayerGameStat.club_code, PlayerGameStat.player_code, func.max(PlayerGameStat.player_name))
+        .where(PlayerGameStat.season_code == season)
+        .group_by(PlayerGameStat.club_code, PlayerGameStat.player_code)
+    )
+    if club:
+        q = q.where(PlayerGameStat.club_code == club)
+    names: dict[str, dict[str, str]] = {}
+    for c, pc, n in session.execute(q):
+        names.setdefault(c, {})[pc] = short_name(n)
+    return names
 
 
 def ratings(pf: float, pa: float, poss: float) -> dict:
@@ -2258,17 +2273,9 @@ def ratings(pf: float, pa: float, poss: float) -> dict:
     return {"offRating": round(off, 1), "defRating": round(deff, 1), "netRating": round(off - deff, 1)}
 
 
-@app.get("/api/clubs/{code}/lineups")
-def club_lineups(code: str, season: str = DEFAULT_SEASON) -> dict:
-    """Five-, three- and two-player combinations for a team: minutes together
-    and points scored / allowed per 100 possessions, from valid stints of
-    usable games (see stints.py)."""
-    code = code.upper()
-    with Session(engine) as session:
-        stints = club_stints(session, code, season)
-        names = club_player_names(session, code, season)
-        progress = season_progress(session, season)
-
+def aggregate_lineups(stints: list[tuple], names: dict[str, str], progress: float) -> dict:
+    """Combinations of 5, 3 and 2 players over a club's stints: every
+    qualifying row per size (sorted by minutes), team totals and games."""
     agg = {size: {} for size in LINEUP_MIN_MINUTES}
     team = {"sec": 0, "pf": 0, "pa": 0, "poss": 0.0}
     games = set()
@@ -2308,15 +2315,86 @@ def club_lineups(code: str, season: str = DEFAULT_SEASON) -> dict:
                 **ratings(a["pf"], a["pa"], a["poss"]),
             })
         rows.sort(key=lambda r: -r["minutes"])
-        sizes[str(size)] = {"minMinutes": min_minutes, "combinations": len(combos), "rows": rows[:25]}
-
+        sizes[str(size)] = {"minMinutes": min_minutes, "combinations": len(combos), "rows": rows}
     return {
-        "season": season,
-        "club": code,
         "games": len(games),
         "team": {"minutes": round(team["sec"] / 60), **ratings(team["pf"], team["pa"], team["poss"])},
         "sizes": sizes,
     }
+
+
+@app.get("/api/clubs/{code}/lineups")
+def club_lineups(code: str, season: str = DEFAULT_SEASON) -> dict:
+    """Five-, three- and two-player combinations for a team: minutes together
+    and points scored / allowed per 100 possessions, from valid stints of
+    usable games (see stints.py)."""
+    code = code.upper()
+    with Session(engine) as session:
+        stints = club_stints(session, code, season)
+        names = season_player_names(session, season, code).get(code, {})
+        progress = season_progress(session, season)
+    result = aggregate_lineups(stints, names, progress)
+    for block in result["sizes"].values():
+        block["rows"] = block["rows"][:25]
+    return {"season": season, "club": code, **result}
+
+
+def club_badge(clubs: dict[str, Club], code: str) -> dict:
+    club = clubs.get(code)
+    return {"clubCode": code, "clubName": club.name if club else code,
+            "clubCrest": club.crest_url if club else None}
+
+
+_league_cache: dict[tuple, tuple] = {}
+
+
+def cached_hour(name: str, season: str, compute) -> dict:
+    """League-wide aggregates scan a whole season of stints and only change
+    with the nightly refresh, so keep each result for an hour."""
+    hit = _league_cache.get((name, season))
+    now = datetime.utcnow()
+    if hit and (now - hit[0]).total_seconds() < 3600:
+        return hit[1]
+    value = compute()
+    _league_cache[(name, season)] = (now, value)
+    return value
+
+
+@app.get("/api/lineups")
+def league_lineups(season: str = DEFAULT_SEASON) -> dict:
+    return cached_hour("lineups", season, lambda: _league_lineups(season))
+
+
+def _league_lineups(season: str) -> dict:
+    """League-wide lineup leaderboard: every club's qualifying combinations,
+    with the most used and the best by net rating for each size."""
+    with Session(engine) as session:
+        by_club = side_stints(session, season)
+        names = season_player_names(session, season)
+        progress = season_progress(session, season)
+        clubs = load_clubs(session)
+    merged: dict[str, dict] = {}
+    for code, stints in by_club.items():
+        result = aggregate_lineups(stints, names.get(code, {}), progress)
+        badge = club_badge(clubs, code)
+        for size, block in result["sizes"].items():
+            m = merged.setdefault(size, {"minMinutes": block["minMinutes"], "combinations": 0, "rows": []})
+            m["combinations"] += block["combinations"]
+            m["rows"].extend({**r, **badge} for r in block["rows"])
+    for block in merged.values():
+        rows = block["rows"]
+        most = sorted(rows, key=lambda r: -r["minutes"])[:60]
+        best = sorted((r for r in rows if r["netRating"] is not None), key=lambda r: -r["netRating"])[:60]
+        seen, keep = set(), []
+        for r in most + best:
+            key = (r["clubCode"], tuple(p["playerCode"] for p in r["players"]))
+            if key not in seen:
+                seen.add(key)
+                keep.append(r)
+        block["qualified"] = len(rows)
+        block["rows"] = sorted(keep, key=lambda r: -r["minutes"])
+    games = len({g for stints in by_club.values() for g, *_ in stints})
+    return {"season": season, "games": games, "sizes": merged}
 
 
 # Full-season minimums (34 games) for on/off, scaled by season progress.
@@ -2324,13 +2402,10 @@ ONOFF_MIN_ON = (300, 20)
 ONOFF_MIN_OFF = (100, 10)
 
 
-def club_onoff(session, code: str, season: str) -> dict:
-    """On/off for every player of a club: team ratings with him on court vs on
-    the bench, counting only games he played in (a missed game means a
-    different rotation, which would muddy the comparison)."""
-    stints = club_stints(session, code, season)
-    names = club_player_names(session, code, season)
-    progress = season_progress(session, season)
+def onoff_rows(stints: list[tuple], names: dict[str, str], progress: float) -> dict:
+    """On/off for every player in a club's stints: team ratings with him on
+    court vs on the bench, counting only games he played in (a missed game
+    means a different rotation, which would muddy the comparison)."""
     min_on = max(ONOFF_MIN_ON[1], round(ONOFF_MIN_ON[0] * progress))
     min_off = max(ONOFF_MIN_OFF[1], round(ONOFF_MIN_OFF[0] * progress))
 
@@ -2373,15 +2448,28 @@ def club_onoff(session, code: str, season: str) -> dict:
             "qualified": on_min >= min_on and off_min >= min_off,
             "smallSample": on_min < 2 * min_on or off_min < 2 * min_off,
         })
+    return {
+        "minOnMinutes": min_on,
+        "minOffMinutes": min_off,
+        "team": {"minutes": round(team["sec"] / 60), **ratings(team["pf"], team["pa"], team["poss"])},
+        "rows": rows,
+    }
+
+
+def club_onoff(session, code: str, season: str) -> dict:
+    stints = club_stints(session, code, season)
+    names = season_player_names(session, season, code).get(code, {})
+    data = onoff_rows(stints, names, season_progress(session, season))
+    rows = data.pop("rows")
     ranked = sorted((r for r in rows if r["qualified"] and r["swing"] is not None), key=lambda r: -r["swing"])
     for i, r in enumerate(ranked, 1):
         r["rank"] = i
     return {
         "season": season,
         "club": code,
-        "minOnMinutes": min_on,
-        "minOffMinutes": min_off,
-        "team": {"minutes": round(team["sec"] / 60), **ratings(team["pf"], team["pa"], team["poss"])},
+        "minOnMinutes": data["minOnMinutes"],
+        "minOffMinutes": data["minOffMinutes"],
+        "team": data["team"],
         "qualified": len(ranked),
         "players": ranked + sorted((r for r in rows if r not in ranked), key=lambda r: -r["on"]["minutes"]),
     }
@@ -2391,6 +2479,42 @@ def club_onoff(session, code: str, season: str) -> dict:
 def club_onoff_route(code: str, season: str = DEFAULT_SEASON) -> dict:
     with Session(engine) as session:
         return club_onoff(session, code.upper(), season)
+
+
+@app.get("/api/impact")
+def league_onoff(season: str = DEFAULT_SEASON) -> dict:
+    return cached_hour("impact", season, lambda: _league_onoff(season))
+
+
+def _league_onoff(season: str) -> dict:
+    """League-wide on/off leaderboard: every qualifying player, ranked by
+    swing. A player who changed clubs appears once per club."""
+    with Session(engine) as session:
+        by_club = side_stints(session, season)
+        names = season_player_names(session, season)
+        progress = season_progress(session, season)
+        clubs = load_clubs(session)
+    players, min_on, min_off, unranked = [], None, None, 0
+    for code, stints in by_club.items():
+        data = onoff_rows(stints, names.get(code, {}), progress)
+        min_on, min_off = data["minOnMinutes"], data["minOffMinutes"]
+        badge = club_badge(clubs, code)
+        for r in data["rows"]:
+            if r["qualified"] and r["swing"] is not None:
+                players.append({**r, **badge})
+            else:
+                unranked += 1
+    players.sort(key=lambda r: -r["swing"])
+    for i, r in enumerate(players, 1):
+        r["rank"] = i
+    return {
+        "season": season,
+        "minOnMinutes": min_on or 0,
+        "minOffMinutes": min_off or 0,
+        "qualified": len(players),
+        "unranked": unranked,
+        "players": players,
+    }
 
 
 @app.get("/api/players/{player_code}/onoff")

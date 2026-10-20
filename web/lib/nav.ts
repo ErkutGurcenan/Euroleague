@@ -18,6 +18,8 @@ export const NAV: NavItem[] = [
           { href: "/highs", label: "Season highs", description: "Best single-game performances" },
           { href: "/shooting", label: "Shooting", description: "True shooting, eFG% and splits" },
           { href: "/notable", label: "Notable games", description: "Comebacks, blowouts, thrillers" },
+          { href: "/lineups", label: "Best lineups", description: "Top five-, three- and two-man groups" },
+          { href: "/impact", label: "Player impact", description: "On/off swing for every player" },
           { href: "/referees", label: "Referees", description: "How games are officiated" },
         ],
       },
