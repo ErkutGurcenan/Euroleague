@@ -9,12 +9,13 @@ import re
 import sys
 import unicodedata
 from datetime import datetime
+from itertools import combinations
 from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import create_engine, func, select
+from sqlalchemy import create_engine, func, or_, select
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "pipeline"))
@@ -2193,6 +2194,112 @@ def club_history(code: str) -> dict:
             },
             "seasons": seasons,
         }
+
+
+ROMAN = {"II", "III", "IV"}
+
+
+def short_name(name: Optional[str]) -> str:
+    """'MILLER-MCINTYRE, CODI' -> 'Miller-Mcintyre'; keeps suffixes like III."""
+    last = (name or "").split(",")[0].strip()
+    return " ".join(w if w in ROMAN else w.title() for w in last.split())
+
+
+# Full-season minimums (34 games); scaled down by season progress, with floors.
+LINEUP_MIN_MINUTES = {5: (60, 8), 3: (120, 15), 2: (200, 25)}
+
+
+def possessions(fga: int, fta: int, oreb: int, tov: int) -> float:
+    return fga + 0.44 * fta - oreb + tov
+
+
+@app.get("/api/clubs/{code}/lineups")
+def club_lineups(code: str, season: str = DEFAULT_SEASON) -> dict:
+    """Five-, three- and two-player combinations for a team: minutes together
+    and points scored / allowed per 100 possessions, from valid stints of
+    usable games (see stints.py)."""
+    code = code.upper()
+    with Session(engine) as session:
+        stints = session.execute(
+            select(LineupStint)
+            .join(StintCheck, (StintCheck.season_code == LineupStint.season_code)
+                  & (StintCheck.game_code == LineupStint.game_code))
+            .where(LineupStint.season_code == season, LineupStint.valid, StintCheck.usable,
+                   or_(LineupStint.home_club == code, LineupStint.away_club == code))
+        ).scalars().all()
+        names = {
+            pc: short_name(n)
+            for pc, n in session.execute(
+                select(PlayerGameStat.player_code, func.max(PlayerGameStat.player_name))
+                .where(PlayerGameStat.season_code == season, PlayerGameStat.club_code == code)
+                .group_by(PlayerGameStat.player_code)
+            )
+        }
+        progress = season_progress(session, season)
+
+    agg = {size: {} for size in LINEUP_MIN_MINUTES}
+    team = {"sec": 0, "pf": 0, "pa": 0, "poss": 0.0}
+    games = set()
+    for st in stints:
+        home = st.home_club == code
+        lineup = st.home_lineup if home else st.away_lineup
+        side, opp = ("home", "away") if home else ("away", "home")
+        pf, pa = getattr(st, f"{side}_pts"), getattr(st, f"{opp}_pts")
+        own = possessions(*(getattr(st, f"{side}_{k}") for k in ("fga", "fta", "oreb", "tov")))
+        other = possessions(*(getattr(st, f"{opp}_{k}") for k in ("fga", "fta", "oreb", "tov")))
+        poss = (own + other) / 2
+        sec = st.end_sec - st.start_sec
+        games.add(st.game_code)
+        for k, v in (("sec", sec), ("pf", pf), ("pa", pa), ("poss", poss)):
+            team[k] += v
+        players = lineup.split("|")
+        for size in agg:
+            for combo in combinations(players, size):
+                a = agg[size].setdefault(combo, {"sec": 0, "pf": 0, "pa": 0, "poss": 0.0, "games": set()})
+                a["sec"] += sec
+                a["pf"] += pf
+                a["pa"] += pa
+                a["poss"] += poss
+                a["games"].add(st.game_code)
+
+    def ratings(pf: int, pa: int, poss: float) -> dict:
+        if poss <= 0:
+            return {"offRating": None, "defRating": None, "netRating": None}
+        off, deff = 100 * pf / poss, 100 * pa / poss
+        return {"offRating": round(off, 1), "defRating": round(deff, 1), "netRating": round(off - deff, 1)}
+
+    sizes = {}
+    for size, combos in agg.items():
+        full, floor = LINEUP_MIN_MINUTES[size]
+        min_minutes = max(floor, round(full * progress))
+        rows = []
+        for combo, a in combos.items():
+            minutes = a["sec"] / 60
+            if minutes < min_minutes:
+                continue
+            rows.append({
+                "players": sorted(
+                    ({"playerCode": pc, "name": names.get(pc, pc)} for pc in combo),
+                    key=lambda p: p["name"],
+                ),
+                "minutes": round(minutes, 1),
+                "games": len(a["games"]),
+                "possessions": round(a["poss"]),
+                "pointsFor": a["pf"],
+                "pointsAgainst": a["pa"],
+                "smallSample": minutes < 2 * min_minutes,
+                **ratings(a["pf"], a["pa"], a["poss"]),
+            })
+        rows.sort(key=lambda r: -r["minutes"])
+        sizes[str(size)] = {"minMinutes": min_minutes, "combinations": len(combos), "rows": rows[:25]}
+
+    return {
+        "season": season,
+        "club": code,
+        "games": len(games),
+        "team": {"minutes": round(team["sec"] / 60), **ratings(team["pf"], team["pa"], team["poss"])},
+        "sizes": sizes,
+    }
 
 
 @app.get("/api/clubs/{code}")

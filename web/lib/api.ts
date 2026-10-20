@@ -669,6 +669,31 @@ export function getRotation(gameCode: number, season?: string) {
   return get<Rotation>(`/api/games/${gameCode}/rotation${qs({ season })}`);
 }
 
+export type LineupRow = {
+  players: { playerCode: string; name: string }[];
+  minutes: number;
+  games: number;
+  possessions: number;
+  pointsFor: number;
+  pointsAgainst: number;
+  smallSample: boolean;
+  offRating: number | null;
+  defRating: number | null;
+  netRating: number | null;
+};
+
+export type ClubLineups = {
+  season: string;
+  club: string;
+  games: number;
+  team: { minutes: number; offRating: number | null; defRating: number | null; netRating: number | null };
+  sizes: Record<"5" | "3" | "2", { minMinutes: number; combinations: number; rows: LineupRow[] }>;
+};
+
+export function getClubLineups(code: string, season?: string) {
+  return get<ClubLineups>(`/api/clubs/${code}/lineups${qs({ season })}`);
+}
+
 export function getMeta() {
   return get<{
     seasons: number;

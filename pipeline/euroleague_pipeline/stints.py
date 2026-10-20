@@ -141,7 +141,7 @@ def rebuild(events: list[tuple], home: str, away: str, starters: dict[str, set[s
             counts[f"{side}_fga"] += 1
         if ptype in FTA:
             counts[f"{side}_fta"] += 1
-        if ptype == "O":
+        if ptype == "O" and player:  # team rebounds (mostly after missed FTs) don't extend possessions
             counts[f"{side}_oreb"] += 1
         elif ptype == "TO":
             counts[f"{side}_tov"] += 1
