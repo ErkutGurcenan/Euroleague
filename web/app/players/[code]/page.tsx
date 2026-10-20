@@ -2,10 +2,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import GameLogChart from "@/components/GameLogChart";
+import { PlayerAdjusted } from "@/components/AdjustedImpact";
 import { PlayerImpact } from "@/components/OnOff";
 import PlayerViewToggle from "@/components/PlayerViewToggle";
 import ShotChartExplorer from "@/components/ShotChartExplorer";
-import { getPlayer, getPlayerOnOff, getPlayerShots } from "@/lib/api";
+import { getPlayer, getPlayerImpact, getPlayerOnOff, getPlayerShots } from "@/lib/api";
 import { currentSeason } from "@/lib/season";
 
 function StatCard({ label, value }: { label: string; value: string | number }) {
@@ -38,12 +39,13 @@ export default async function PlayerPage({
 }) {
   const { code } = await params;
   const season = await currentSeason();
-  let player, shotData, onoff;
+  let player, shotData, onoff, impact;
   try {
-    [player, shotData, onoff] = await Promise.all([
+    [player, shotData, onoff, impact] = await Promise.all([
       getPlayer(code, season),
       getPlayerShots(code, season),
       getPlayerOnOff(code, season).catch(() => null),
+      getPlayerImpact(code, season).catch(() => null),
     ]);
   } catch {
     notFound();
@@ -125,12 +127,20 @@ export default async function PlayerPage({
         </div>
       )}
 
-      {onoff && onoff.entries.length > 0 && (
+      {(impact?.current || (onoff && onoff.entries.length > 0)) && (
         <>
           <h2 className="mb-3 text-lg font-semibold">Impact</h2>
-          <div className="mb-8">
-            <PlayerImpact entries={onoff.entries} />
-          </div>
+          {impact && (impact.current || impact.history.length > 0) && (
+            <div className="mb-6">
+              <PlayerAdjusted data={impact} />
+            </div>
+          )}
+          {onoff && onoff.entries.length > 0 && (
+            <div className="mb-8">
+              <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-neutral-400">On/off</h3>
+              <PlayerImpact entries={onoff.entries} />
+            </div>
+          )}
         </>
       )}
 

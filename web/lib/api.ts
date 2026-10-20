@@ -759,6 +759,41 @@ export function getLeagueOnOff(season?: string) {
   return get<LeagueOnOff>(`/api/impact${qs({ season })}`);
 }
 
+export type ImpactValues = {
+  off: number;
+  def: number;
+  total: number;
+  offRange: number;
+  defRange: number;
+  totalRange: number;
+  minutes: number;
+  start: number;
+};
+
+export type AdjustedImpactRow = ImpactValues & ClubBadge & { rank: number; playerCode: string; name: string };
+
+export type AdjustedImpact = {
+  season: string;
+  minMinutes: number;
+  homeEdge: number | null;
+  players: AdjustedImpactRow[];
+};
+
+export type PlayerImpactData = {
+  season: string;
+  playerCode: string;
+  current: (ImpactValues & ClubBadge & { rank: number | null; qualified: number | null; minMinutes: number | null }) | null;
+  history: (ImpactValues & ClubBadge & { season: string; seasonLabel: string })[];
+};
+
+export function getAdjustedImpact(season?: string) {
+  return get<AdjustedImpact>(`/api/impact/adjusted${qs({ season })}`);
+}
+
+export function getPlayerImpact(code: string, season?: string) {
+  return get<PlayerImpactData>(`/api/players/${code}/impact${qs({ season })}`);
+}
+
 export function getClubOnOff(code: string, season?: string) {
   return get<ClubOnOff>(`/api/clubs/${code}/onoff${qs({ season })}`);
 }
