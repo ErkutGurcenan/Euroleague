@@ -2,9 +2,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import GameLogChart from "@/components/GameLogChart";
+import { PlayerImpact } from "@/components/OnOff";
 import PlayerViewToggle from "@/components/PlayerViewToggle";
 import ShotChartExplorer from "@/components/ShotChartExplorer";
-import { getPlayer, getPlayerShots } from "@/lib/api";
+import { getPlayer, getPlayerOnOff, getPlayerShots } from "@/lib/api";
 import { currentSeason } from "@/lib/season";
 
 function StatCard({ label, value }: { label: string; value: string | number }) {
@@ -37,11 +38,12 @@ export default async function PlayerPage({
 }) {
   const { code } = await params;
   const season = await currentSeason();
-  let player, shotData;
+  let player, shotData, onoff;
   try {
-    [player, shotData] = await Promise.all([
+    [player, shotData, onoff] = await Promise.all([
       getPlayer(code, season),
       getPlayerShots(code, season),
+      getPlayerOnOff(code, season).catch(() => null),
     ]);
   } catch {
     notFound();
@@ -121,6 +123,15 @@ export default async function PlayerPage({
             }))}
           />
         </div>
+      )}
+
+      {onoff && onoff.entries.length > 0 && (
+        <>
+          <h2 className="mb-3 text-lg font-semibold">Impact</h2>
+          <div className="mb-8">
+            <PlayerImpact entries={onoff.entries} />
+          </div>
+        </>
       )}
 
       <h2 className="mb-3 text-lg font-semibold">Shooting</h2>

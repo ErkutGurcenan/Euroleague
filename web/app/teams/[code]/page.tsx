@@ -5,7 +5,9 @@ import GameCard from "@/components/GameCard";
 import Headshot from "@/components/Headshot";
 import { isMedical, StatusPill } from "@/components/InjuryStatus";
 import ShotChartExplorer from "@/components/ShotChartExplorer";
-import { getClub, getClubHistory, getClubShots, getInjuries } from "@/lib/api";
+import LineupsPanel from "@/components/LineupsPanel";
+import { OnOffRanking } from "@/components/OnOff";
+import { getClub, getClubHistory, getClubLineups, getClubOnOff, getClubShots, getInjuries } from "@/lib/api";
 import { currentSeason } from "@/lib/season";
 
 function age(birthDate: string | null): string {
@@ -39,13 +41,15 @@ export default async function TeamPage({
 }) {
   const { code } = await params;
   const season = await currentSeason();
-  let data, shotData, history, injuryReport;
+  let data, shotData, history, injuryReport, lineups, onoff;
   try {
-    [data, shotData, history, injuryReport] = await Promise.all([
+    [data, shotData, history, injuryReport, lineups, onoff] = await Promise.all([
       getClub(code.toUpperCase(), season),
       getClubShots(code.toUpperCase(), season),
       getClubHistory(code.toUpperCase()).catch(() => null),
       getInjuries().catch(() => null),
+      getClubLineups(code.toUpperCase(), season).catch(() => null),
+      getClubOnOff(code.toUpperCase(), season).catch(() => null),
     ]);
   } catch {
     notFound();
@@ -275,6 +279,24 @@ export default async function TeamPage({
           </tbody>
         </table>
       </div>
+
+      {lineups && lineups.games > 0 && (
+        <>
+          <h2 className="mb-3 text-lg font-semibold">Lineups</h2>
+          <div className="mb-8">
+            <LineupsPanel data={lineups} />
+          </div>
+        </>
+      )}
+
+      {onoff && onoff.players.length > 0 && (
+        <>
+          <h2 className="mb-3 text-lg font-semibold">Player impact (on/off)</h2>
+          <div className="mb-8">
+            <OnOffRanking data={onoff} />
+          </div>
+        </>
+      )}
 
       {upcoming.length > 0 && (
         <>

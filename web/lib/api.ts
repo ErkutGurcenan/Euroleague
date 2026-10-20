@@ -637,6 +637,138 @@ export function getFantasy(season?: string) {
   }>(`/api/fantasy${qs({ season })}`);
 }
 
+export type RotationPlayer = {
+  playerCode: string;
+  name: string;
+  starter: boolean;
+  segments: [number, number][];
+  plusMinus: number;
+  seconds: number;
+};
+
+export type RotationTeam = {
+  code: string;
+  name: string;
+  crestUrl: string | null;
+  players: RotationPlayer[];
+};
+
+export type Rotation =
+  | { available: false }
+  | {
+      available: true;
+      usable: boolean;
+      length: number;
+      periods: number[];
+      home: RotationTeam;
+      away: RotationTeam;
+      stints: { start: number; end: number; homeNet: number; valid: boolean }[];
+    };
+
+export function getRotation(gameCode: number, season?: string) {
+  return get<Rotation>(`/api/games/${gameCode}/rotation${qs({ season })}`);
+}
+
+export type ClubBadge = { clubCode: string; clubName: string; clubCrest: string | null };
+
+export type LineupRow = Partial<ClubBadge> & {
+  players: { playerCode: string; name: string }[];
+  minutes: number;
+  games: number;
+  possessions: number;
+  pointsFor: number;
+  pointsAgainst: number;
+  smallSample: boolean;
+  offRating: number | null;
+  defRating: number | null;
+  netRating: number | null;
+};
+
+export type ClubLineups = {
+  season: string;
+  club: string;
+  games: number;
+  team: { minutes: number; offRating: number | null; defRating: number | null; netRating: number | null };
+  sizes: Record<"5" | "3" | "2", { minMinutes: number; combinations: number; rows: LineupRow[] }>;
+};
+
+export function getClubLineups(code: string, season?: string) {
+  return get<ClubLineups>(`/api/clubs/${code}/lineups${qs({ season })}`);
+}
+
+export type LeagueLineups = {
+  season: string;
+  games: number;
+  sizes: Record<"5" | "3" | "2", { minMinutes: number; combinations: number; qualified: number; rows: LineupRow[] }>;
+};
+
+export function getLeagueLineups(season?: string) {
+  return get<LeagueLineups>(`/api/lineups${qs({ season })}`);
+}
+
+export type OnOffSide = {
+  minutes: number;
+  possessions: number;
+  offRating: number | null;
+  defRating: number | null;
+  netRating: number | null;
+};
+
+export type OnOffRow = Partial<ClubBadge> & {
+  playerCode: string;
+  name: string;
+  games: number;
+  on: OnOffSide;
+  off: OnOffSide;
+  swing: number | null;
+  qualified: boolean;
+  smallSample: boolean;
+  rank?: number;
+};
+
+export type ClubOnOff = {
+  season: string;
+  club: string;
+  minOnMinutes: number;
+  minOffMinutes: number;
+  team: { minutes: number; offRating: number | null; defRating: number | null; netRating: number | null };
+  qualified: number;
+  players: OnOffRow[];
+};
+
+export type PlayerOnOffEntry = OnOffRow & {
+  club: string;
+  clubName: string;
+  clubCrest: string | null;
+  team: ClubOnOff["team"];
+  qualifiedPlayers: number;
+  minOnMinutes: number;
+  minOffMinutes: number;
+};
+
+export type LeagueOnOff = {
+  season: string;
+  minOnMinutes: number;
+  minOffMinutes: number;
+  qualified: number;
+  unranked: number;
+  players: OnOffRow[];
+};
+
+export function getLeagueOnOff(season?: string) {
+  return get<LeagueOnOff>(`/api/impact${qs({ season })}`);
+}
+
+export function getClubOnOff(code: string, season?: string) {
+  return get<ClubOnOff>(`/api/clubs/${code}/onoff${qs({ season })}`);
+}
+
+export function getPlayerOnOff(code: string, season?: string) {
+  return get<{ season: string; playerCode: string; entries: PlayerOnOffEntry[] }>(
+    `/api/players/${code}/onoff${qs({ season })}`,
+  );
+}
+
 export function getMeta() {
   return get<{
     seasons: number;
