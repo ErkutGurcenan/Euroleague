@@ -229,3 +229,55 @@ class PersonStint(Base):
     start_date: Mapped[Optional[datetime]] = mapped_column(DateTime)
     end_date: Mapped[Optional[datetime]] = mapped_column(DateTime)
     image_url: Mapped[Optional[str]] = mapped_column(String(300))
+
+
+class LineupStint(Base):
+    """A stretch of a game with the same ten players on court, rebuilt from
+    the play-by-play (see stints.py). Lineups are the five player codes,
+    sorted and joined with "|"; counts feed possession estimates."""
+
+    __tablename__ = "stints"
+    __table_args__ = (UniqueConstraint("season_code", "game_code", "stint_no"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    season_code: Mapped[str] = mapped_column(String(8), index=True)
+    game_code: Mapped[int] = mapped_column(Integer)
+    stint_no: Mapped[int] = mapped_column(Integer)
+    period: Mapped[int] = mapped_column(Integer)  # 1-4, then 5 = OT1, 6 = OT2...
+    start_sec: Mapped[int] = mapped_column(Integer)  # seconds since tip-off
+    end_sec: Mapped[int] = mapped_column(Integer)
+    home_club: Mapped[str] = mapped_column(String(8))
+    away_club: Mapped[str] = mapped_column(String(8))
+    home_lineup: Mapped[str] = mapped_column(String(120), index=True)
+    away_lineup: Mapped[str] = mapped_column(String(120), index=True)
+    home_pts: Mapped[int] = mapped_column(Integer, default=0)
+    away_pts: Mapped[int] = mapped_column(Integer, default=0)
+    home_fga: Mapped[int] = mapped_column(Integer, default=0)
+    away_fga: Mapped[int] = mapped_column(Integer, default=0)
+    home_fta: Mapped[int] = mapped_column(Integer, default=0)
+    away_fta: Mapped[int] = mapped_column(Integer, default=0)
+    home_oreb: Mapped[int] = mapped_column(Integer, default=0)
+    away_oreb: Mapped[int] = mapped_column(Integer, default=0)
+    home_tov: Mapped[int] = mapped_column(Integer, default=0)
+    away_tov: Mapped[int] = mapped_column(Integer, default=0)
+    valid: Mapped[bool] = mapped_column(Boolean, default=True)  # 5 v 5 on court
+
+
+class StintCheck(Base):
+    """Per-game validation of the stint rebuild against the official box score."""
+
+    __tablename__ = "stint_checks"
+    __table_args__ = (UniqueConstraint("season_code", "game_code"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    season_code: Mapped[str] = mapped_column(String(8), index=True)
+    game_code: Mapped[int] = mapped_column(Integer)
+    usable: Mapped[bool] = mapped_column(Boolean)  # score matches, >= 95% of time valid
+    score_ok: Mapped[bool] = mapped_column(Boolean)
+    lineups_ok: Mapped[bool] = mapped_column(Boolean)  # always 5 v 5, no impossible subs
+    invalid_sec: Mapped[int] = mapped_column(Integer, default=0)  # time not 5 v 5
+    players: Mapped[int] = mapped_column(Integer)
+    pm_exact: Mapped[int] = mapped_column(Integer)  # rebuilt +/- equals official
+    pm_within3: Mapped[int] = mapped_column(Integer)
+    minutes_within30: Mapped[int] = mapped_column(Integer)  # within 30 s of official
+    issues: Mapped[Optional[str]] = mapped_column(String(300))
