@@ -759,6 +759,58 @@ export function getLeagueOnOff(season?: string) {
   return get<LeagueOnOff>(`/api/impact${qs({ season })}`);
 }
 
+export type Prediction = {
+  gameCode: number;
+  season: string;
+  utcDate: string | null;
+  madeAt: string;
+  home: ClubBadge;
+  away: ClubBadge;
+  homeWinProb: number;
+  homeMargin: number;
+  eloHomeProb: number;
+  ratingDiff: number;
+  netDiff: number;
+  homeCourt: number;
+  factors: Record<string, number>;
+  modelVersion: string;
+  result?: { homeScore: number; awayScore: number; correct: boolean; preGame: boolean };
+};
+
+export type Score = {
+  games: number;
+  correct?: number;
+  accuracy: number | null;
+  logLoss?: number | null;
+  brier?: number | null;
+};
+
+export type PredictionsOverview = {
+  season: string;
+  upcoming: Prediction[];
+  record: Score;
+  eloRecord: Score;
+  recent: Prediction[];
+  backtest: {
+    model: Score;
+    elo: Score;
+    homeAlways: Score;
+    favourites70: Score;
+    seasons: (Score & { season: string; seasonLabel: string })[];
+    calibration: { from: number; to: number; games: number; predicted: number; actual: number }[];
+  };
+};
+
+export function getGamePrediction(gameCode: number, season?: string) {
+  return get<({ available: true } & Prediction) | { available: false }>(
+    `/api/games/${gameCode}/prediction${qs({ season })}`,
+  );
+}
+
+export function getPredictions(season?: string) {
+  return get<PredictionsOverview>(`/api/predictions${qs({ season })}`);
+}
+
 export type PowerRanking = ClubBadge & {
   rank: number;
   rating: number;

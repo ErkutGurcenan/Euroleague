@@ -364,3 +364,30 @@ class SeasonOdds(Base):
     playoffs: Mapped[float] = mapped_column(Float)  # top 6 or through the play-in
     final_four: Mapped[float] = mapped_column(Float)
     champion: Mapped[float] = mapped_column(Float)
+
+
+class GamePrediction(Base):
+    """Pre-game prediction for a game (see predict.py). Rewritten each run
+    until tip-off, then frozen, so played games keep their genuine pre-game
+    call. backtest = True rows are walk-forward predictions for past seasons
+    (model trained only on earlier seasons), used to report accuracy."""
+
+    __tablename__ = "game_predictions"
+    __table_args__ = (UniqueConstraint("season_code", "game_code", "backtest"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    season_code: Mapped[str] = mapped_column(String(8), index=True)
+    game_code: Mapped[int] = mapped_column(Integer)
+    backtest: Mapped[bool] = mapped_column(Boolean, default=False)
+    made_at: Mapped[datetime] = mapped_column(DateTime)
+    utc_date: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    home_club: Mapped[str] = mapped_column(String(8))
+    away_club: Mapped[str] = mapped_column(String(8))
+    home_win_prob: Mapped[float] = mapped_column(Float)
+    home_margin: Mapped[float] = mapped_column(Float)
+    elo_home_prob: Mapped[float] = mapped_column(Float)  # ratings-only baseline
+    rating_diff: Mapped[float] = mapped_column(Float)
+    net_diff: Mapped[float] = mapped_column(Float)
+    home_court: Mapped[float] = mapped_column(Float)
+    factors: Mapped[Optional[str]] = mapped_column(String(400))  # JSON: contribution per input
+    model_version: Mapped[str] = mapped_column(String(40))

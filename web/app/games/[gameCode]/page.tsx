@@ -3,9 +3,10 @@ import { notFound } from "next/navigation";
 import Headshot from "@/components/Headshot";
 import HeadToHead from "@/components/HeadToHead";
 import { appliesToRound, isMedical, StatusPill, timeline } from "@/components/InjuryStatus";
+import { PredictionCard } from "@/components/Predictions";
 import RotationChart from "@/components/RotationChart";
 import ShotChart from "@/components/ShotChart";
-import { getGame, getHeadToHead, getInjuries, getRotation, type GameDetailSide } from "@/lib/api";
+import { getGame, getGamePrediction, getHeadToHead, getInjuries, getRotation, type GameDetailSide } from "@/lib/api";
 import { currentSeason } from "@/lib/season";
 
 function BoxScoreTable({ side }: { side: GameDetailSide }) {
@@ -167,12 +168,13 @@ export default async function GamePage({
   const { home, away } = game;
   // A current injury report says little about games weeks away.
   const soon = !game.played && startsWithinDays(game.utcDate, 14);
-  const [h2h, injuryReport, rotation] = await Promise.all([
+  const [h2h, injuryReport, rotation, prediction] = await Promise.all([
     home.club && away.club
       ? getHeadToHead(home.club.code, away.club.code).catch(() => null)
       : null,
     soon ? getInjuries().catch(() => null) : null,
     game.played ? getRotation(game.gameCode, game.season).catch(() => null) : null,
+    getGamePrediction(game.gameCode, game.season).catch(() => null),
   ]);
   const unavailable =
     injuryReport && injuryReport.season === game.season
@@ -282,6 +284,15 @@ export default async function GamePage({
           </table>
         )}
       </div>
+
+      {prediction?.available && (!prediction.result || prediction.result.preGame) && (
+        <>
+          <h2 className="mb-3 text-lg font-semibold">Prediction</h2>
+          <div className="mb-8">
+            <PredictionCard p={prediction} />
+          </div>
+        </>
+      )}
 
       {game.played && (
         <>
