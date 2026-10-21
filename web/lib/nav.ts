@@ -15,6 +15,7 @@ export const NAV: NavItem[] = [
       {
         title: "This season",
         links: [
+          { href: "/rankings", label: "Power rankings", description: "How strong each team is right now" },
           { href: "/highs", label: "Season highs", description: "Best single-game performances" },
           { href: "/shooting", label: "Shooting", description: "True shooting, eFG% and splits" },
           { href: "/notable", label: "Notable games", description: "Comebacks, blowouts, thrillers" },
