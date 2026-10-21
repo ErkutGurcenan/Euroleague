@@ -5,6 +5,7 @@ Run from api/:  ../pipeline/.venv/bin/uvicorn main:app --reload
 from __future__ import annotations
 
 import json
+import math
 import re
 import sys
 import unicodedata
@@ -24,6 +25,7 @@ from euroleague_pipeline.models import (  # noqa: E402
     Award,
     Club,
     Game,
+    GamePrediction,
     GameReferee,
     ImpactSeason,
     LineupStint,
@@ -952,6 +954,130 @@ def notable_games(season: str = DEFAULT_SEASON, limit: int = 8) -> dict:
                 },
             ],
         }
+
+
+def prediction_dict(p: GamePrediction, clubs: dict[str, Club], game: Optional[Game] = None) -> dict:
+    factors = json.loads(p.factors) if p.factors else {}
+    out = {
+        "gameCode": p.game_code,
+        "season": p.season_code,
+        "utcDate": p.utc_date.isoformat() + "Z" if p.utc_date else None,
+        "madeAt": p.made_at.isoformat() + "Z",
+        "home": club_badge(clubs, p.home_club),
+        "away": club_badge(clubs, p.away_club),
+        "homeWinProb": p.home_win_prob,
+        "homeMargin": p.home_margin,
+        "eloHomeProb": p.elo_home_prob,
+        "ratingDiff": p.rating_diff,
+        "netDiff": p.net_diff,
+        "homeCourt": p.home_court,
+        "factors": factors,
+        "modelVersion": p.model_version,
+    }
+    if game is not None and game.played and game.local_score is not None:
+        home_won = game.local_score > game.road_score
+        out["result"] = {
+            "homeScore": game.local_score, "awayScore": game.road_score,
+            "correct": (p.home_win_prob > 0.5) == home_won,
+            "preGame": bool(p.utc_date and p.made_at < p.utc_date),
+        }
+    return out
+
+
+@app.get("/api/games/{game_code}/prediction")
+def game_prediction(game_code: int, season: str = DEFAULT_SEASON) -> dict:
+    """The model's pre-game call for a game (see pipeline predict.py)."""
+    with Session(engine) as session:
+        p = session.execute(
+            select(GamePrediction).where(GamePrediction.season_code == season,
+                                         GamePrediction.game_code == game_code,
+                                         GamePrediction.backtest.is_(False))
+        ).scalar_one_or_none()
+        if p is None:
+            return {"available": False}
+        game = session.execute(
+            select(Game).where(Game.season_code == season, Game.game_code == game_code)
+        ).scalar_one_or_none()
+        return {"available": True, **prediction_dict(p, load_clubs(session), game)}
+
+
+@app.get("/api/predictions")
+def predictions_overview(season: str = DEFAULT_SEASON) -> dict:
+    """Upcoming calls, the live track record (pre-game calls only) and the
+    walk-forward backtest of past seasons."""
+    now = datetime.utcnow()
+    with Session(engine) as session:
+        clubs = load_clubs(session)
+        games = {
+            (g.season_code, g.game_code): g
+            for g in session.execute(select(Game).where(Game.played)).scalars()
+        }
+        live = session.execute(
+            select(GamePrediction).where(GamePrediction.backtest.is_(False), GamePrediction.season_code == season)
+            .order_by(GamePrediction.utc_date)
+        ).scalars().all()
+        backtest = session.execute(
+            select(GamePrediction).where(GamePrediction.backtest.is_(True))
+        ).scalars().all()
+
+    upcoming = [prediction_dict(p, clubs) for p in live
+                if p.utc_date and p.utc_date > now and (p.utc_date - now).days < 8]
+    graded = []
+    for p in live:
+        g = games.get((p.season_code, p.game_code))
+        if g is not None and p.utc_date and p.made_at < p.utc_date:
+            graded.append(prediction_dict(p, clubs, g))
+    graded.sort(key=lambda d: d["utcDate"] or "", reverse=True)
+
+    def score(items: list[tuple[float, bool]]) -> dict:
+        if not items:
+            return {"games": 0, "correct": 0, "accuracy": None, "logLoss": None, "brier": None}
+        n = len(items)
+        correct = sum((p > 0.5) == won for p, won in items)
+        ll = -sum(math.log(min(max(p if won else 1 - p, 1e-6), 1)) for p, won in items) / n
+        brier = sum((p - won) ** 2 for p, won in items) / n
+        return {"games": n, "correct": correct, "accuracy": round(correct / n, 4),
+                "logLoss": round(ll, 4), "brier": round(brier, 4)}
+
+    record = score([(d["homeWinProb"], d["result"]["homeScore"] > d["result"]["awayScore"]) for d in graded])
+    elo_record = score([(d["eloHomeProb"], d["result"]["homeScore"] > d["result"]["awayScore"]) for d in graded])
+
+    by_season: dict[str, list] = {}
+    model_items, elo_items, home_items = [], [], []
+    for p in backtest:
+        g = games.get((p.season_code, p.game_code))
+        if g is None:
+            continue
+        won = g.local_score > g.road_score
+        by_season.setdefault(p.season_code, []).append((p.home_win_prob, won))
+        model_items.append((p.home_win_prob, won))
+        elo_items.append((p.elo_home_prob, won))
+        home_items.append((0.999 if p.home_court else 0.5, won))
+    calibration = []
+    for lo in [i / 10 for i in range(10)]:
+        sel = [(pr, w) for pr, w in model_items if lo <= pr < lo + 0.1]
+        if len(sel) >= 20:
+            calibration.append({"from": lo, "to": round(lo + 0.1, 1), "games": len(sel),
+                                "predicted": round(sum(pr for pr, _ in sel) / len(sel), 3),
+                                "actual": round(sum(w for _, w in sel) / len(sel), 3)})
+    favourites = [(pr, w) for pr, w in model_items if abs(pr - 0.5) >= 0.2]
+    return {
+        "season": season,
+        "upcoming": upcoming,
+        "record": record,
+        "eloRecord": elo_record,
+        "recent": graded[:40],
+        "backtest": {
+            "model": score(model_items),
+            "elo": score(elo_items),
+            "homeAlways": {"games": len(home_items),
+                           "accuracy": round(sum(w for _, w in home_items) / len(home_items), 4) if home_items else None},
+            "favourites70": {"games": len(favourites),
+                             "accuracy": round(sum((pr > 0.5) == w for pr, w in favourites) / len(favourites), 4) if favourites else None},
+            "seasons": [{"season": s, "seasonLabel": season_label(s), **score(items)} for s, items in sorted(by_season.items())],
+            "calibration": calibration,
+        },
+    }
 
 
 @app.get("/api/games/{game_code}/rotation")

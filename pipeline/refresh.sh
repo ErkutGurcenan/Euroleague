@@ -33,5 +33,6 @@ echo "=== $(date -Is) refresh ${season} ==="
 .venv/bin/python -m euroleague_pipeline.impact
 .venv/bin/python -m euroleague_pipeline.ratings
 .venv/bin/python -m euroleague_pipeline.simulate --season "$season"
+.venv/bin/python -m euroleague_pipeline.predict
 .venv/bin/python -m euroleague_pipeline.seed_awards
 echo "=== $(date -Is) refresh ${season} done ==="

@@ -6,6 +6,7 @@ export const NAV: NavItem[] = [
   { href: "/", label: "Home" },
   { href: "/standings", label: "Standings" },
   { href: "/games", label: "Games" },
+  { href: "/predictions", label: "Predictions" },
   { href: "/teams", label: "Teams" },
   { href: "/players", label: "Players" },
   { href: "/injuries", label: "Injuries" },
