@@ -2,16 +2,46 @@ export const metadata = { title: "Standings" };
 
 import Link from "next/link";
 import PositionChart from "@/components/PositionChart";
-import { getStandings, getStandingsHistory } from "@/lib/api";
+import { OddsTable } from "@/components/Ratings";
+import { getOdds, getStandings, getStandingsHistory } from "@/lib/api";
 import { currentSeason } from "@/lib/season";
 
 export default async function StandingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ round?: string }>;
+  searchParams: Promise<{ round?: string; view?: string }>;
 }) {
   const params = await searchParams;
   const season = await currentSeason();
+  const tab = (active: boolean) =>
+    `px-3 py-1 text-xs transition-colors ${active ? "bg-orange-600 text-white" : "text-neutral-400 hover:text-white"}`;
+  const viewToggle = (view: "table" | "odds") => (
+    <span className="flex overflow-hidden rounded-md border border-neutral-700">
+      <Link href="/standings" className={tab(view === "table")}>Table</Link>
+      <Link href="/standings?view=odds" className={tab(view === "odds")}>Odds</Link>
+    </span>
+  );
+
+  if (params.view === "odds") {
+    const odds = await getOdds(season);
+    return (
+      <div>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold">Standings</h1>
+            {viewToggle("odds")}
+          </div>
+          <span className="text-sm text-neutral-400">Season odds from {odds.simulations.toLocaleString("en-GB")} simulations</span>
+        </div>
+        {odds.available ? (
+          <OddsTable teams={odds.teams} simulations={odds.simulations} remainingGames={odds.remainingGames} />
+        ) : (
+          <p className="text-sm text-neutral-500">Odds are only simulated while regular-season games remain.</p>
+        )}
+      </div>
+    );
+  }
+
   const requested = params.round ? Number(params.round) : undefined;
   const [{ round, standings }, history] = await Promise.all([
     getStandings(requested, season),
@@ -24,8 +54,11 @@ export default async function StandingsPage({
 
   return (
     <div>
-      <div className="mb-4 flex items-baseline justify-between">
-        <h1 className="text-2xl font-bold">Standings</h1>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold">Standings</h1>
+          {viewToggle("table")}
+        </div>
         <span className="text-sm text-neutral-400">
           Regular season · after Round {round}
         </span>

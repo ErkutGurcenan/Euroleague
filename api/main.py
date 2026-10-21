@@ -31,9 +31,11 @@ from euroleague_pipeline.models import (  # noqa: E402
     PersonStint,
     PlayerGameStat,
     PlayerImpact,
+    SeasonOdds,
     Shot,
     StandingRow,
     StintCheck,
+    TeamRating,
 )
 
 DB_PATH = REPO_ROOT / "db" / "euroleague.db"
@@ -2503,6 +2505,71 @@ def impact_table(session, season: str) -> tuple[list[PlayerImpact], int]:
         .order_by(PlayerImpact.total.desc())
     ).scalars().all()
     return rows, min_minutes
+
+
+def elo_win_probability(diff: float) -> float:
+    return 1 / (1 + 10 ** (-diff / 400))
+
+
+@app.get("/api/rankings")
+def power_rankings(season: str = DEFAULT_SEASON) -> dict:
+    """Elo power rankings (see pipeline ratings.py): current rating, change in
+    the last game, recent trend and record per club."""
+    with Session(engine) as session:
+        clubs = load_clubs(session)
+        history: dict[str, list[TeamRating]] = {}
+        for r in session.execute(
+            select(TeamRating).where(TeamRating.season_code == season)
+            .order_by(TeamRating.utc_date, TeamRating.game_code)
+        ).scalars():
+            history.setdefault(r.club_code, []).append(r)
+    rows = []
+    for code, games in history.items():
+        current = games[-1].rating_after
+        trend = [games[0].rating_before] + [g.rating_after for g in games]
+        rows.append({
+            **club_badge(clubs, code),
+            "rating": round(current),
+            "change": round(games[-1].rating_after - games[-1].rating_before, 1),
+            "seasonChange": round(current - games[0].rating_before, 1),
+            "wins": sum(g.won for g in games),
+            "losses": sum(not g.won for g in games),
+            "beatsAverage": round(elo_win_probability(current - 1500), 3),
+            "trend": [round(t, 1) for t in trend[-11:]],
+        })
+    rows.sort(key=lambda r: -r["rating"])
+    for i, r in enumerate(rows, 1):
+        r["rank"] = i
+    return {"season": season, "teams": rows}
+
+
+@app.get("/api/odds")
+def season_odds(season: str = DEFAULT_SEASON) -> dict:
+    """Simulated end-of-season probabilities (see pipeline simulate.py)."""
+    with Session(engine) as session:
+        clubs = load_clubs(session)
+        rows = session.execute(
+            select(SeasonOdds).where(SeasonOdds.season_code == season)
+        ).scalars().all()
+        remaining = session.execute(
+            select(func.count()).select_from(Game)
+            .where(Game.season_code == season, Game.phase_type == "RS", Game.played.is_(False))
+        ).scalar()
+    teams = [
+        {**club_badge(clubs, r.club_code), "rating": round(r.rating), "wins": r.wins, "losses": r.losses,
+         "projWins": r.proj_wins, "projLosses": r.proj_losses, "firstSeed": r.first_seed, "top6": r.top6,
+         "playIn": r.play_in, "playoffs": r.playoffs, "finalFour": r.final_four, "champion": r.champion}
+        for r in rows
+    ]
+    teams.sort(key=lambda t: (-t["projWins"], -t["champion"]))
+    return {
+        "season": season,
+        "available": bool(rows),
+        "computedAt": rows[0].computed_at.isoformat() + "Z" if rows else None,
+        "simulations": rows[0].simulations if rows else 0,
+        "remainingGames": remaining,
+        "teams": teams,
+    }
 
 
 @app.get("/api/impact/adjusted")

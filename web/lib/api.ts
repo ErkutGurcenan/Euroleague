@@ -759,6 +759,46 @@ export function getLeagueOnOff(season?: string) {
   return get<LeagueOnOff>(`/api/impact${qs({ season })}`);
 }
 
+export type PowerRanking = ClubBadge & {
+  rank: number;
+  rating: number;
+  change: number;
+  seasonChange: number;
+  wins: number;
+  losses: number;
+  beatsAverage: number;
+  trend: number[];
+};
+
+export function getRankings(season?: string) {
+  return get<{ season: string; teams: PowerRanking[] }>(`/api/rankings${qs({ season })}`);
+}
+
+export type TeamOdds = ClubBadge & {
+  rating: number;
+  wins: number;
+  losses: number;
+  projWins: number;
+  projLosses: number;
+  firstSeed: number;
+  top6: number;
+  playIn: number;
+  playoffs: number;
+  finalFour: number;
+  champion: number;
+};
+
+export function getOdds(season?: string) {
+  return get<{
+    season: string;
+    available: boolean;
+    computedAt: string | null;
+    simulations: number;
+    remainingGames: number;
+    teams: TeamOdds[];
+  }>(`/api/odds${qs({ season })}`);
+}
+
 export type ImpactValues = {
   off: number;
   def: number;

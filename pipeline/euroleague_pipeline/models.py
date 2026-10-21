@@ -320,3 +320,47 @@ class ImpactSeason(Base):
     cv_model: Mapped[float] = mapped_column(Float)  # held-out error with players
     players: Mapped[int] = mapped_column(Integer)
     rows: Mapped[int] = mapped_column(Integer)
+
+
+class TeamRating(Base):
+    """Elo rating of a club around one game (see ratings.py): one row per
+    club per game, with the pre-game win probability the rating implied."""
+
+    __tablename__ = "team_ratings"
+    __table_args__ = (UniqueConstraint("season_code", "game_code", "club_code"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    season_code: Mapped[str] = mapped_column(String(8), index=True)
+    game_code: Mapped[int] = mapped_column(Integer)
+    club_code: Mapped[str] = mapped_column(String(8), index=True)
+    opponent_code: Mapped[str] = mapped_column(String(8))
+    home: Mapped[bool] = mapped_column(Boolean)
+    utc_date: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    rating_before: Mapped[float] = mapped_column(Float)
+    rating_after: Mapped[float] = mapped_column(Float)
+    win_prob: Mapped[float] = mapped_column(Float)
+    won: Mapped[bool] = mapped_column(Boolean)
+
+
+class SeasonOdds(Base):
+    """Simulated end-of-season probabilities per club (see simulate.py)."""
+
+    __tablename__ = "season_odds"
+    __table_args__ = (UniqueConstraint("season_code", "club_code"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    season_code: Mapped[str] = mapped_column(String(8), index=True)
+    club_code: Mapped[str] = mapped_column(String(8))
+    computed_at: Mapped[datetime] = mapped_column(DateTime)
+    simulations: Mapped[int] = mapped_column(Integer)
+    rating: Mapped[float] = mapped_column(Float)
+    wins: Mapped[int] = mapped_column(Integer)  # so far
+    losses: Mapped[int] = mapped_column(Integer)
+    proj_wins: Mapped[float] = mapped_column(Float)
+    proj_losses: Mapped[float] = mapped_column(Float)
+    first_seed: Mapped[float] = mapped_column(Float)
+    top6: Mapped[float] = mapped_column(Float)
+    play_in: Mapped[float] = mapped_column(Float)  # finishes 7th-10th
+    playoffs: Mapped[float] = mapped_column(Float)  # top 6 or through the play-in
+    final_four: Mapped[float] = mapped_column(Float)
+    champion: Mapped[float] = mapped_column(Float)
