@@ -759,6 +759,17 @@ export function getLeagueOnOff(season?: string) {
   return get<LeagueOnOff>(`/api/impact${qs({ season })}`);
 }
 
+export type AiCall = {
+  provider?: string;
+  model?: string;
+  homeWinProb: number;
+  confidence: number | null;
+  madeAt?: string;
+  facts?: string;
+  correct?: boolean;
+  preGame?: boolean;
+};
+
 export type Prediction = {
   gameCode: number;
   season: string;
@@ -775,6 +786,7 @@ export type Prediction = {
   factors: Record<string, number>;
   modelVersion: string;
   result?: { homeScore: number; awayScore: number; correct: boolean; preGame: boolean };
+  ai?: AiCall | null;
 };
 
 export type Score = {
@@ -791,6 +803,14 @@ export type PredictionsOverview = {
   record: Score;
   eloRecord: Score;
   recent: Prediction[];
+  challenger: {
+    provider: string;
+    games: number;
+    ours: Score;
+    ai: Score;
+    recent: Prediction[];
+    upcomingCalls: number;
+  };
   backtest: {
     model: Score;
     elo: Score;

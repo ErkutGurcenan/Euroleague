@@ -56,6 +56,34 @@ function marginText(p: Prediction): string {
   return `Expected margin: ${team} by ${Math.abs(m).toFixed(1)}`;
 }
 
+function favouriteOf(homeProb: number, p: Prediction): { team: ClubBadge; prob: number } {
+  return homeProb >= 0.5 ? { team: p.home, prob: homeProb } : { team: p.away, prob: 1 - homeProb };
+}
+
+/** Jev's call for the same game, graded after the game. */
+function AiLine({ p }: { p: Prediction }) {
+  if (!p.ai) return null;
+  const ai = favouriteOf(p.ai.homeWinProb, p);
+  const ours = favouriteOf(p.homeWinProb, p);
+  const disagree = ai.team.clubCode !== ours.team.clubCode;
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-md border border-neutral-800 bg-neutral-950/60 px-3 py-2 text-sm">
+      <span className="text-neutral-400">{p.result ? "Jev AI's pre-game call:" : "Jev AI's call:"}</span>
+      <span className="font-semibold">{ai.team.clubName} {pct(ai.prob)}</span>
+      {p.result && p.ai.correct !== undefined ? (
+        <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${p.ai.correct ? "bg-emerald-500/15 text-emerald-400" : "bg-red-500/15 text-red-400"}`}>
+          {p.ai.correct ? "Correct" : "Missed"}
+        </span>
+      ) : (
+        disagree && <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-xs text-amber-300">disagrees with us</span>
+      )}
+      <span className="w-full text-xs text-neutral-500">
+        TypeSafe&apos;s Jev, given the same kind of facts (records, form, ratings, efficiency, home court) but not our prediction.
+      </span>
+    </div>
+  );
+}
+
 /** Match page: the model's call, or for finished games the pre-game call graded. */
 export function PredictionCard({ p }: { p: Prediction }) {
   const favourite = p.homeWinProb >= 0.5 ? p.home : p.away;
@@ -85,6 +113,7 @@ export function PredictionCard({ p }: { p: Prediction }) {
           </span>
         ))}
       </div>
+      {p.ai && (!p.result || p.ai.preGame) && <AiLine p={p} />}
       <p className="text-xs text-neutral-500">
         Ratings alone give {p.home.clubCode} {pct(p.eloHomeProb)}. The call combines power ratings,
         season efficiency and home court, is updated every night and is locked at tip-off.{" "}
@@ -112,6 +141,7 @@ export function UpcomingList({ items }: { items: Prediction[] }) {
             <th className="px-3 py-2">Game</th>
             <th className="px-3 py-2">Win probability</th>
             <th className="px-3 py-2 text-right">Expected margin</th>
+            <th className="px-3 py-2 text-right">Jev AI</th>
           </tr>
         </thead>
         <tbody>
@@ -128,6 +158,17 @@ export function UpcomingList({ items }: { items: Prediction[] }) {
               <td className="min-w-[14rem] px-3 py-2"><ProbBar p={p} height="h-5" /></td>
               <td className="px-3 py-2 text-right tabular-nums text-neutral-300">
                 {Math.abs(p.homeMargin) < 0.5 ? "even" : `${p.homeMargin > 0 ? p.home.clubCode : p.away.clubCode} +${Math.abs(p.homeMargin).toFixed(1)}`}
+              </td>
+              <td className="px-3 py-2 text-right tabular-nums">
+                {p.ai ? (() => {
+                  const ai = favouriteOf(p.ai.homeWinProb, p);
+                  const disagree = ai.team.clubCode !== favouriteOf(p.homeWinProb, p).team.clubCode;
+                  return (
+                    <span className={disagree ? "text-amber-300" : "text-neutral-400"} title={disagree ? "Jev picks a different winner" : undefined}>
+                      {ai.team.clubCode} {pct(ai.prob)}
+                    </span>
+                  );
+                })() : <span className="text-neutral-600">–</span>}
               </td>
             </tr>
           ))}
@@ -293,6 +334,80 @@ export function BacktestPanel({ data }: { data: PredictionsOverview }) {
           they didn&apos;t improve the backtest.
         </p>
       </div>
+    </div>
+  );
+}
+
+export function ChallengerPanel({ data }: { data: PredictionsOverview }) {
+  const c = data.challenger;
+  const card = (label: string, sc: typeof c.ours, highlight: boolean) => (
+    <div className={`rounded-lg border bg-neutral-900/40 px-4 py-3 ${highlight ? "border-orange-600/60" : "border-neutral-800"}`}>
+      <div className="text-xs uppercase text-neutral-500">{label}</div>
+      <div className="text-2xl font-bold tabular-nums">
+        {sc.games ? `${sc.correct}–${sc.games - (sc.correct ?? 0)}` : "–"}
+      </div>
+      <div className="text-xs text-neutral-500">
+        {sc.games ? `${pct(sc.accuracy ?? 0)} correct · log loss ${(sc.logLoss ?? 0).toFixed(3)} · Brier ${(sc.brier ?? 0).toFixed(3)}` : "no graded games yet"}
+      </div>
+    </div>
+  );
+  const oursBetter = c.games > 0 && (c.ours.logLoss ?? 9) < (c.ai.logLoss ?? 9);
+  return (
+    <div className="grid gap-3">
+      <div className="grid gap-3 sm:grid-cols-2">
+        {card("Eurostepper model", c.ours, oursBetter)}
+        {card(c.provider, c.ai, c.games > 0 && !oursBetter)}
+      </div>
+      {c.games === 0 ? (
+        <p className="text-sm text-neutral-400">
+          Both models have called every game of the next week ({`${c.upcomingCalls} games`}), before tip-off.
+          The scores start filling in after Round 7&apos;s first games are played.
+        </p>
+      ) : (
+        <div className="overflow-x-auto rounded-lg border border-neutral-800">
+          <table className="w-full whitespace-nowrap text-sm">
+            <thead className="bg-neutral-900 text-left text-xs uppercase text-neutral-400">
+              <tr>
+                <th className="px-3 py-2">Game</th>
+                <th className="px-3 py-2">Result</th>
+                <th className="px-3 py-2">Eurostepper</th>
+                <th className="px-3 py-2">Jev</th>
+              </tr>
+            </thead>
+            <tbody>
+              {c.recent.map((p) => {
+                const homeWon = (p.result?.homeScore ?? 0) > (p.result?.awayScore ?? 0);
+                const call = (prob: number) => {
+                  const f = favouriteOf(prob, p);
+                  const right = (prob >= 0.5) === homeWon;
+                  return (
+                    <span className={right ? "text-emerald-400" : "text-red-400"}>
+                      {f.team.clubCode} {pct(f.prob)} {right ? "✓" : "✗"}
+                    </span>
+                  );
+                };
+                return (
+                  <tr key={p.gameCode} className="border-t border-neutral-800/60">
+                    <td className="px-3 py-2">
+                      <Link href={`/games/${p.gameCode}`} className="hover:text-orange-400">{p.home.clubCode} v {p.away.clubCode}</Link>
+                    </td>
+                    <td className="px-3 py-2 tabular-nums text-neutral-400">{p.result?.homeScore}–{p.result?.awayScore}</td>
+                    <td className="px-3 py-2 tabular-nums">{call(p.homeWinProb)}</td>
+                    <td className="px-3 py-2 tabular-nums">{p.ai ? call(p.ai.homeWinProb) : "–"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <p className="text-xs text-neutral-500">
+        Jev is TypeSafe&apos;s decision model. Before each game it gets the same kind of facts our model
+        uses (records, last five results, power ratings, season efficiency, home court) but never our
+        prediction, and answers which team wins with a probability for each side. Only calls made before
+        tip-off count. Log loss and Brier score reward well-judged probabilities (lower is better);
+        probabilities are capped at 1% and 99% for log loss so one certain miss can&apos;t dominate.
+      </p>
     </div>
   );
 }

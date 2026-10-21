@@ -391,3 +391,26 @@ class GamePrediction(Base):
     home_court: Mapped[float] = mapped_column(Float)
     factors: Mapped[Optional[str]] = mapped_column(String(400))  # JSON: contribution per input
     model_version: Mapped[str] = mapped_column(String(40))
+
+
+class AiPrediction(Base):
+    """An outside AI model's pre-game call (see ai_challenger.py), stored next
+    to our own predictions for a fair comparison. Rewritten until tip-off,
+    then frozen; the facts sent are kept for transparency."""
+
+    __tablename__ = "ai_predictions"
+    __table_args__ = (UniqueConstraint("season_code", "game_code", "provider"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    season_code: Mapped[str] = mapped_column(String(8), index=True)
+    game_code: Mapped[int] = mapped_column(Integer)
+    provider: Mapped[str] = mapped_column(String(20))  # e.g. "jev"
+    model: Mapped[str] = mapped_column(String(60))
+    made_at: Mapped[datetime] = mapped_column(DateTime)
+    utc_date: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    home_club: Mapped[str] = mapped_column(String(8))
+    away_club: Mapped[str] = mapped_column(String(8))
+    home_win_prob: Mapped[float] = mapped_column(Float)
+    confidence: Mapped[Optional[float]] = mapped_column(Float)
+    state: Mapped[str] = mapped_column(String(1500))  # the facts the model was given
+    cost_usd: Mapped[Optional[float]] = mapped_column(Float)

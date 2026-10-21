@@ -22,6 +22,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "pipeline"))
 
 from euroleague_pipeline.models import (  # noqa: E402
+    AiPrediction,
     Award,
     Club,
     Game,
@@ -984,6 +985,19 @@ def prediction_dict(p: GamePrediction, clubs: dict[str, Club], game: Optional[Ga
     return out
 
 
+AI_PROVIDER_LABEL = "Jev (TypeSafe)"
+CLIP = 0.01  # log loss with probabilities capped at 1% / 99%, so one certain miss can't dominate
+
+
+def ai_dict(a: AiPrediction, game: Optional[Game] = None) -> dict:
+    out = {"provider": AI_PROVIDER_LABEL, "model": a.model, "homeWinProb": a.home_win_prob,
+           "confidence": a.confidence, "madeAt": a.made_at.isoformat() + "Z", "facts": a.state}
+    if game is not None and game.played and game.local_score is not None:
+        out["correct"] = (a.home_win_prob > 0.5) == (game.local_score > game.road_score)
+        out["preGame"] = bool(a.utc_date and a.made_at < a.utc_date)
+    return out
+
+
 @app.get("/api/games/{game_code}/prediction")
 def game_prediction(game_code: int, season: str = DEFAULT_SEASON) -> dict:
     """The model's pre-game call for a game (see pipeline predict.py)."""
@@ -998,7 +1012,12 @@ def game_prediction(game_code: int, season: str = DEFAULT_SEASON) -> dict:
         game = session.execute(
             select(Game).where(Game.season_code == season, Game.game_code == game_code)
         ).scalar_one_or_none()
-        return {"available": True, **prediction_dict(p, load_clubs(session), game)}
+        ai = session.execute(
+            select(AiPrediction).where(AiPrediction.season_code == season, AiPrediction.game_code == game_code)
+        ).scalar_one_or_none()
+        out = {"available": True, **prediction_dict(p, load_clubs(session), game)}
+        out["ai"] = ai_dict(ai, game) if ai else None
+        return out
 
 
 @app.get("/api/predictions")
@@ -1019,9 +1038,18 @@ def predictions_overview(season: str = DEFAULT_SEASON) -> dict:
         backtest = session.execute(
             select(GamePrediction).where(GamePrediction.backtest.is_(True))
         ).scalars().all()
+        ai_calls = {
+            (a.season_code, a.game_code): a
+            for a in session.execute(select(AiPrediction).where(AiPrediction.season_code == season)).scalars()
+        }
 
-    upcoming = [prediction_dict(p, clubs) for p in live
-                if p.utc_date and p.utc_date > now and (p.utc_date - now).days < 8]
+    upcoming = []
+    for p in live:
+        if p.utc_date and p.utc_date > now and (p.utc_date - now).days < 8:
+            item = prediction_dict(p, clubs)
+            a = ai_calls.get((p.season_code, p.game_code))
+            item["ai"] = ai_dict(a) if a else None
+            upcoming.append(item)
     graded = []
     for p in live:
         g = games.get((p.season_code, p.game_code))
@@ -1038,6 +1066,24 @@ def predictions_overview(season: str = DEFAULT_SEASON) -> dict:
         brier = sum((p - won) ** 2 for p, won in items) / n
         return {"games": n, "correct": correct, "accuracy": round(correct / n, 4),
                 "logLoss": round(ll, 4), "brier": round(brier, 4)}
+
+    head_to_head = []
+    for d in graded:
+        a = ai_calls.get((d["season"], d["gameCode"]))
+        if a is not None and a.utc_date and a.made_at < a.utc_date:
+            head_to_head.append({**d, "ai": {"homeWinProb": a.home_win_prob, "confidence": a.confidence}})
+
+    def clipped(items: list[tuple[float, bool]]) -> dict:
+        return score([(min(max(p, CLIP), 1 - CLIP), won) for p, won in items])
+
+    challenger = {
+        "provider": AI_PROVIDER_LABEL,
+        "games": len(head_to_head),
+        "ours": clipped([(d["homeWinProb"], d["result"]["homeScore"] > d["result"]["awayScore"]) for d in head_to_head]),
+        "ai": clipped([(d["ai"]["homeWinProb"], d["result"]["homeScore"] > d["result"]["awayScore"]) for d in head_to_head]),
+        "recent": head_to_head[:40],
+        "upcomingCalls": sum(1 for u in upcoming if u.get("ai")),
+    }
 
     record = score([(d["homeWinProb"], d["result"]["homeScore"] > d["result"]["awayScore"]) for d in graded])
     elo_record = score([(d["eloHomeProb"], d["result"]["homeScore"] > d["result"]["awayScore"]) for d in graded])
@@ -1067,6 +1113,7 @@ def predictions_overview(season: str = DEFAULT_SEASON) -> dict:
         "record": record,
         "eloRecord": elo_record,
         "recent": graded[:40],
+        "challenger": challenger,
         "backtest": {
             "model": score(model_items),
             "elo": score(elo_items),
