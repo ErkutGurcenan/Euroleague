@@ -1,6 +1,6 @@
 export const metadata = { title: "Predictions" };
 
-import { BacktestPanel, ChallengerPanel, TrackRecord, UpcomingList } from "@/components/Predictions";
+import { BacktestPanel, ChallengerPanel, MarketPanel, PaperTradingPanel, TrackRecord, UpcomingList } from "@/components/Predictions";
 import { getPredictions } from "@/lib/api";
 import { currentSeason } from "@/lib/season";
 
@@ -25,6 +25,14 @@ export default async function PredictionsPage() {
       <section className="grid gap-3">
         <h2 className="text-lg font-semibold">Eurostepper vs AI</h2>
         <ChallengerPanel data={data} />
+      </section>
+      <section className="grid gap-3">
+        <h2 className="text-lg font-semibold">Against the market</h2>
+        <MarketPanel data={data} />
+      </section>
+      <section className="grid gap-3">
+        <h2 className="text-lg font-semibold">Paper trading</h2>
+        <PaperTradingPanel data={data} />
       </section>
       <section className="grid gap-3">
         <h2 className="text-lg font-semibold">How accurate is the model?</h2>

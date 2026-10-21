@@ -787,6 +787,61 @@ export type Prediction = {
   modelVersion: string;
   result?: { homeScore: number; awayScore: number; correct: boolean; preGame: boolean };
   ai?: AiCall | null;
+  market?: MarketPrice | null;
+  paperTrades?: PaperTrade[];
+};
+
+/** Polymarket's price for the home team winning (in dollars per $1 share). */
+export type MarketPrice = {
+  homePrice: number;
+  bid: number | null;
+  ask: number | null;
+  capturedAt: string;
+  volume: number | null;
+};
+
+export type PaperTrade = {
+  strategy: string;
+  modelHomeProb: number | null;
+  marketHomePrice: number;
+  pricedAt: string;
+  side: "home" | "away" | null;
+  price: number | null;
+  shares: number;
+  cost: number | null;
+  fee: number | null;
+  status: "open" | "won" | "lost" | "skipped";
+  note: string | null;
+  pnl: number | null;
+};
+
+export type StrategySummary = {
+  key: string;
+  label: string;
+  trades: number;
+  settled: number;
+  won: number;
+  lost: number;
+  open: number;
+  openStake: number;
+  skipped: number;
+  homeBuys: number;
+  awayBuys: number;
+  staked: number;
+  fees: number;
+  pnl: number;
+  roi: number | null;
+};
+
+export type PaperGame = {
+  gameCode: number;
+  utcDate: string | null;
+  home: ClubBadge;
+  away: ClubBadge;
+  result: { homeScore: number; awayScore: number } | null;
+  marketHomePrice: number;
+  pricedAt: string;
+  trades: Record<string, PaperTrade>;
 };
 
 export type Score = {
@@ -810,6 +865,21 @@ export type PredictionsOverview = {
     ai: Score;
     recent: Prediction[];
     upcomingCalls: number;
+  };
+  market: {
+    source: string;
+    games: number;
+    ours: Score;
+    ai: Score;
+    market: Score;
+    disagree: { ours: { games: number; right: number }; ai: { games: number; right: number } };
+    upcomingPriced: number;
+    paper: {
+      shares: number;
+      strategies: StrategySummary[];
+      games: PaperGame[];
+      series: { gameCode: number; label: string; eurostepper: number; jev: number }[];
+    };
   };
   backtest: {
     model: Score;
