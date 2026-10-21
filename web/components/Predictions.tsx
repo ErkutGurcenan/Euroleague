@@ -707,12 +707,13 @@ export function PaperTradingPanel({ data }: { data: PredictionsOverview }) {
         </div>
       )}
       <NextTrades items={data.upcoming} />
+      {/* one string: the JSX compiler drops the space after an expression in multi-line text with entities */}
       <p className="text-xs text-neutral-500">
-        Simulated trades: no money is staked, and this is not betting advice. Percentages are each side&apos;s
-        home win chance. Trades use the last price saved before tip-off, filled at what the order book
-        charged for {`${paper.shares} shares`} then, plus Polymarket&apos;s taker fee (5% × price × (1 − price) a
-        share). A game is skipped if the market&apos;s spread is wider than 10¢ or {`${paper.shares} shares`} can&apos;t
-        be bought within 5¢ of the best price.
+        {"Simulated trades: no money is staked, and this is not betting advice. Percentages are each side's "
+          + "home win chance. Trades use the last price saved before tip-off, filled at what the order book "
+          + `charged for ${paper.shares} shares then, plus Polymarket's taker fee (5% × price × (1 − price) a share). `
+          + `A game is skipped if the market's spread is wider than 10¢ or ${paper.shares} shares can't be bought `
+          + "within 5¢ of the best price."}
       </p>
     </div>
   );
