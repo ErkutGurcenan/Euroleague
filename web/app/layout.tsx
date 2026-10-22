@@ -40,6 +40,7 @@ export default async function RootLayout({
   ]);
   const seasons = seasonData?.seasons ?? [];
   const current = selected ?? seasonData?.default ?? "E2025";
+  const seasonPicker = <SeasonSelect seasons={seasons} current={current} />;
   return (
     <html
       lang="en"
@@ -55,11 +56,12 @@ export default async function RootLayout({
               <Logo size={30} />
               Eurostepper
             </Link>
-            <MobileNav />
+            <MobileNav season={seasonPicker} />
             <DesktopNav />
-            <div className="ml-auto flex items-center gap-3">
+            <div className="ml-auto flex min-w-0 items-center gap-3">
               <SearchBox />
-              <SeasonSelect seasons={seasons} current={current} />
+              {/* No room for it on phones: there it sits in the MobileNav menu. */}
+              <div className="hidden sm:flex">{seasonPicker}</div>
             </div>
           </div>
         </header>

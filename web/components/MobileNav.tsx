@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { isActive, NAV, type NavLink } from "@/lib/nav";
 
-export default function MobileNav() {
+export default function MobileNav({ season }: { season: React.ReactNode }) {
   const pathname = usePathname();
   // Opened on a given page; navigating elsewhere closes it.
   const [openOn, setOpenOn] = useState<string | null>(null);
@@ -26,7 +26,8 @@ export default function MobileNav() {
   );
 
   return (
-    <div className="relative lg:hidden">
+    // Below sm the menu hangs from the header's left edge, not the button, so it fits on a phone.
+    <div className="sm:relative lg:hidden">
       <button
         aria-label="Menu"
         aria-expanded={open}
@@ -43,7 +44,14 @@ export default function MobileNav() {
         </svg>
       </button>
       {open && (
-        <nav className="absolute left-0 top-full z-30 mt-2 max-h-[80vh] w-56 overflow-y-auto rounded-md border border-neutral-700 bg-neutral-900 py-1 shadow-xl">
+        <nav className="absolute left-4 top-full z-30 mt-1 max-h-[80vh] w-56 overflow-y-auto rounded-md border border-neutral-700 bg-neutral-900 py-1 shadow-xl sm:left-0 sm:mt-2">
+          {/* The header has no room for the season picker on phones. */}
+          <div className="flex items-center justify-between border-b border-neutral-800 px-3 pb-2 pt-1 sm:hidden">
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+              Season
+            </span>
+            {season}
+          </div>
           {NAV.map((entry) =>
             "groups" in entry ? (
               <div key={entry.label} className="border-y border-neutral-800 py-1">
