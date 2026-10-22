@@ -186,7 +186,7 @@ export default async function TeamPage({
               Full injury report →
             </Link>
           </div>
-          <ul className="mb-8 grid gap-2 sm:grid-cols-2">
+          <ul className="mb-8 grid grid-cols-1 gap-2 sm:grid-cols-2">
             {injured.map((e) => (
               <li
                 key={e.player}

@@ -12,7 +12,7 @@ export default async function ShootingPage() {
   return (
     <div>
       <div className="mb-4 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3 sm:flex-nowrap">
           <h1 className="text-2xl font-bold">Shooting</h1>
           <PlayersToggle active="shooting" />
         </div>
@@ -20,7 +20,7 @@ export default async function ShootingPage() {
           efficiency · qualified players
         </span>
       </div>
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
         {categories.map((cat) => (
           <div
             key={cat.key}

@@ -17,18 +17,21 @@ function GameRow({ entry }: { entry: NotableEntry }) {
     <li className="border-t border-neutral-800/40 first:border-t-0">
       <Link
         href={`/games/${g.gameCode}`}
-        className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-neutral-800/40"
+        className="flex items-baseline gap-2 px-4 py-2 text-sm hover:bg-neutral-800/40 sm:items-center"
       >
         <span className="w-14 shrink-0 text-xs text-neutral-500">{date}</span>
-        <span className="min-w-0 flex-1 truncate">
-          {g.home.name}{" "}
-          <span className="tabular-nums text-neutral-300">
-            {g.home.score}–{g.away.score}
-          </span>{" "}
-          {g.away.name}
-        </span>
-        <span className="shrink-0 rounded bg-neutral-800 px-1.5 py-0.5 text-xs text-orange-400">
-          {entry.note}
+        {/* On phones the note goes under the teams, so neither gets cut off. */}
+        <span className="flex min-w-0 flex-1 flex-col items-start gap-1 sm:flex-row sm:items-center sm:gap-2">
+          <span className="min-w-0 sm:flex-1 sm:truncate">
+            {g.home.name}{" "}
+            <span className="tabular-nums text-neutral-300">
+              {g.home.score}–{g.away.score}
+            </span>{" "}
+            {g.away.name}
+          </span>
+          <span className="shrink-0 rounded bg-neutral-800 px-1.5 py-0.5 text-xs text-orange-400">
+            {entry.note}
+          </span>
         </span>
       </Link>
     </li>
@@ -40,13 +43,13 @@ export default async function NotablePage() {
 
   return (
     <div>
-      <div className="mb-4 flex items-baseline justify-between">
+      <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
         <h1 className="text-2xl font-bold">Notable games</h1>
         <span className="text-sm text-neutral-400">
           The season&apos;s most memorable results
         </span>
       </div>
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {categories.map((cat) => (
           <div
             key={cat.key}

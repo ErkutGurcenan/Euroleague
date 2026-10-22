@@ -117,7 +117,7 @@ export default async function InjuriesPage() {
       <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-neutral-300">
         Out or doubtful
       </h2>
-      <div className="mb-8 grid gap-4 lg:grid-cols-2">
+      <div className="mb-8 grid grid-cols-1 gap-4 lg:grid-cols-2">
         {clubs.map((entries) => (
           <div
             key={entries[0].club}
@@ -162,7 +162,7 @@ export default async function InjuriesPage() {
           <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-neutral-300">
             Cleared to return
           </h2>
-          <ul className="mb-8 grid gap-2 sm:grid-cols-2">
+          <ul className="mb-8 grid grid-cols-1 gap-2 sm:grid-cols-2">
             {cleared.map((e) => (
               <li
                 key={e.player}

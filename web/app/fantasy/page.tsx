@@ -141,7 +141,7 @@ export default async function FantasyPage({
   return (
     <div>
       <div className="mb-4 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3 sm:flex-nowrap">
           <h1 className="text-2xl font-bold">Players</h1>
           <PlayersToggle active="fantasy" />
         </div>

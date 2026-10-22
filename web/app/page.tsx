@@ -239,7 +239,7 @@ export default async function HomePage() {
       )}
 
       {/* standings + leaders */}
-      <div className="mb-6 grid gap-4 lg:grid-cols-2">
+      <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4">
           <div className="mb-2 flex items-baseline justify-between">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-300">
@@ -314,7 +314,7 @@ export default async function HomePage() {
       </div>
 
       {/* highs teaser + final four */}
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4">
           <div className="mb-2 flex items-baseline justify-between">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-300">
