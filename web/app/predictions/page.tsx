@@ -15,7 +15,7 @@ export default async function PredictionsPage() {
         </span>
       </div>
       <section className="grid gap-3">
-        <h2 className="text-lg font-semibold">Next 7 days</h2>
+        <h2 className="text-lg font-semibold">{data.upcomingRound ? `Coming up: ${data.upcomingRound}` : "Coming up"}</h2>
         <UpcomingList items={data.upcoming} />
       </section>
       <section className="grid gap-3">

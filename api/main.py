@@ -1065,6 +1065,26 @@ def game_prediction(game_code: int, season: str = DEFAULT_SEASON) -> dict:
         return out
 
 
+def next_round(schedule: list[Game], now: datetime) -> tuple[set[int], Optional[str]]:
+    """Games still to tip off in the round being played now, or else in the
+    next round, plus any postponed game fitted in before that round ends."""
+    ahead = [g for g in schedule if not g.played and g.utc_date and g.utc_date > now and g.round is not None]
+    if not ahead:
+        return set(), None
+    started = [g.round for g in schedule if g.round is not None and g.utc_date and g.utc_date <= now]
+    current = max(started) if started else None
+    rounds = {g.round for g in ahead}
+    if current in rounds:
+        target = current
+    else:
+        later = [r for r in rounds if current is None or r > current]
+        target = min(later) if later else min(rounds)
+    chosen = [g for g in ahead if g.round == target]
+    last = max(g.utc_date for g in chosen)
+    chosen += [g for g in ahead if g.round < target and g.utc_date <= last]
+    return {g.game_code for g in chosen}, chosen[0].round_name
+
+
 @app.get("/api/predictions")
 def predictions_overview(season: str = DEFAULT_SEASON) -> dict:
     """Upcoming calls, the live track record (pre-game calls only) and the
@@ -1088,6 +1108,8 @@ def predictions_overview(season: str = DEFAULT_SEASON) -> dict:
             for a in session.execute(select(AiPrediction).where(AiPrediction.season_code == season)).scalars()
         }
         prices = pre_game_prices(session, season)
+        shown, round_name = next_round(
+            session.execute(select(Game).where(Game.season_code == season)).scalars().all(), now)
         trades = session.execute(select(PaperTrade).where(PaperTrade.season_code == season)).scalars().all()
         traded_games = {
             g.game_code: g
@@ -1098,7 +1120,7 @@ def predictions_overview(season: str = DEFAULT_SEASON) -> dict:
 
     upcoming = []
     for p in live:
-        if p.utc_date and p.utc_date > now and (p.utc_date - now).days < 8:
+        if p.game_code in shown and p.utc_date and p.utc_date > now:
             item = prediction_dict(p, clubs)
             a = ai_calls.get((p.season_code, p.game_code))
             item["ai"] = ai_dict(a) if a else None
@@ -1167,6 +1189,7 @@ def predictions_overview(season: str = DEFAULT_SEASON) -> dict:
     return {
         "season": season,
         "upcoming": upcoming,
+        "upcomingRound": round_name,
         "record": record,
         "eloRecord": elo_record,
         "recent": graded[:40],

@@ -181,7 +181,7 @@ function when(iso: string | null): string {
 }
 
 export function UpcomingList({ items }: { items: Prediction[] }) {
-  if (items.length === 0) return <p className="text-sm text-neutral-500">No games in the next week.</p>;
+  if (items.length === 0) return <p className="text-sm text-neutral-500">No games scheduled yet.</p>;
   return (
     <div className="overflow-x-auto rounded-lg border border-neutral-800">
       <table className="w-full whitespace-nowrap text-sm">
@@ -423,7 +423,7 @@ export function ChallengerPanel({ data }: { data: PredictionsOverview }) {
       </div>
       {c.games === 0 ? (
         <p className="text-sm text-neutral-400">
-          Both models have called every game of the next week ({`${c.upcomingCalls} games`}), before tip-off.
+          Both models have called every game of the next round ({`${c.upcomingCalls} games`}), before tip-off.
           The scores start filling in after Round 7&apos;s first games are played.
         </p>
       ) : (
@@ -477,6 +477,12 @@ export function ChallengerPanel({ data }: { data: PredictionsOverview }) {
   );
 }
 
+function againstMarket(name: string, x: { games: number; right: number }, total: number): string {
+  if (x.games === 0) return `${name} hasn't picked a different winner from the market yet.`;
+  return `${name} picked a different winner from the market in ${x.games} of ${plural(total, "game")} `
+    + `and was right ${plural(x.right, "time")}.`;
+}
+
 /** Both models graded against Polymarket's last price before tip-off. */
 export function MarketPanel({ data }: { data: PredictionsOverview }) {
   const m = data.market;
@@ -507,9 +513,7 @@ export function MarketPanel({ data }: { data: PredictionsOverview }) {
         </p>
       ) : (
         <p className="text-sm text-neutral-400">
-          {`Eurostepper picked a different winner from the market in ${d.ours.games} of ${plural(m.games, "game")} `
-            + `and was right in ${d.ours.right}. Jev went against the market ${plural(d.ai.games, "time")} `
-            + `and was right in ${d.ai.right}.`}
+          {`${againstMarket("Eurostepper", d.ours, m.games)} ${againstMarket("Jev", d.ai, m.games)}`}
         </p>
       )}
       <p className="text-xs text-neutral-500">

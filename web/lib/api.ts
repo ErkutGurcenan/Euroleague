@@ -855,6 +855,7 @@ export type Score = {
 export type PredictionsOverview = {
   season: string;
   upcoming: Prediction[];
+  upcomingRound: string | null;
   record: Score;
   eloRecord: Score;
   recent: Prediction[];
