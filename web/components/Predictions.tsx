@@ -269,6 +269,9 @@ export function TrackRecord({ data }: { data: PredictionsOverview }) {
         <Stat label="Ratings alone" value={pct(data.eloRecord.accuracy ?? 0)} sub="same games, power ratings only" />
         <Stat label="Log loss" value={(r.logLoss ?? 0).toFixed(3)} sub="lower is better · coin flip 0.693" />
       </div>
+      <Link href="/predictions/history" className="justify-self-start text-sm text-orange-400 hover:underline">
+        Full prediction history, with Jev and Polymarket →
+      </Link>
       <div className="overflow-x-auto rounded-lg border border-neutral-800">
         <table className="w-full whitespace-nowrap text-sm">
           <thead className="bg-neutral-900 text-left text-xs uppercase text-neutral-400">
