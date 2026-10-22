@@ -902,6 +902,38 @@ export function getPredictions(season?: string) {
   return get<PredictionsOverview>(`/api/predictions${qs({ season })}`);
 }
 
+/** A pre-game home win chance graded after the game; correct is null for a 50% call. */
+export type GradedCall = { homeWinProb: number; correct: boolean | null; pickedWinner?: boolean };
+
+export type Tally = { correct: number; total: number; accuracy: number | null };
+
+export type HistoryTallies = { eurostepper: Tally; jev: Tally; market: Tally };
+
+export type HistoryGame = {
+  gameCode: number;
+  utcDate: string | null;
+  round: number | null;
+  roundName: string | null;
+  home: ClubBadge;
+  away: ClubBadge;
+  result: { homeScore: number; awayScore: number };
+  eurostepper: GradedCall | null;
+  jev: GradedCall | null;
+  market: GradedCall | null;
+};
+
+export type PredictionHistory = {
+  season: string;
+  seasonLabel: string;
+  summary: HistoryTallies;
+  rounds: (HistoryTallies & { round: number; roundName: string | null })[];
+  games: HistoryGame[];
+};
+
+export function getPredictionHistory(season?: string) {
+  return get<PredictionHistory>(`/api/predictions/history${qs({ season })}`);
+}
+
 export type PowerRanking = ClubBadge & {
   rank: number;
   rating: number;

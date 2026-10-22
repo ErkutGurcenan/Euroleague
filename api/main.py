@@ -1287,6 +1287,71 @@ def market_overview(graded: list[dict], ai_calls: dict, prices: dict[int, Market
     }
 
 
+def graded_call(p: Optional[float], home_won: bool) -> dict:
+    """A pre-game home win chance against the result. Exactly 50% is no pick."""
+    return {"homeWinProb": p, "correct": None if p == 0.5 else (p > 0.5) == home_won}
+
+
+@app.get("/api/predictions/history")
+def prediction_history(season: str = DEFAULT_SEASON) -> dict:
+    """Every pre-game call graded so far: ours, Jev's and Polymarket's
+    favourite, with correct / total overall and per round."""
+    with Session(engine) as session:
+        clubs = load_clubs(session)
+        played = session.execute(
+            select(Game).where(Game.season_code == season, Game.played, Game.local_score.is_not(None))
+        ).scalars().all()
+        ours = {p.game_code: p for p in session.execute(
+            select(GamePrediction).where(GamePrediction.season_code == season, GamePrediction.backtest.is_(False))
+        ).scalars()}
+        jev = {a.game_code: a for a in session.execute(
+            select(AiPrediction).where(AiPrediction.season_code == season, AiPrediction.provider == "jev")
+        ).scalars()}
+        prices = pre_game_prices(session, season)
+
+    def pre_game(x) -> bool:
+        return x is not None and x.utc_date is not None and x.made_at < x.utc_date
+
+    games = []
+    for g in played:
+        p, a, m = ours.get(g.game_code), jev.get(g.game_code), prices.get(g.game_code)
+        if not (pre_game(p) or pre_game(a) or m is not None):
+            continue
+        home_won = g.local_score > g.road_score
+        games.append({
+            "gameCode": g.game_code,
+            "utcDate": g.utc_date.isoformat() + "Z" if g.utc_date else None,
+            "round": g.round, "roundName": g.round_name,
+            "home": club_badge(clubs, g.local_club_code), "away": club_badge(clubs, g.road_club_code),
+            "result": {"homeScore": g.local_score, "awayScore": g.road_score},
+            "eurostepper": graded_call(p.home_win_prob, home_won) if pre_game(p) else None,
+            # calls with a confidence came from the old pick-the-winner question (before 22 Oct 2026)
+            "jev": {**graded_call(a.home_win_prob, home_won), "pickedWinner": a.confidence is not None}
+                   if pre_game(a) else None,
+            "market": graded_call(m.home_price, home_won) if m is not None else None,
+        })
+    games.sort(key=lambda d: d["utcDate"] or "", reverse=True)
+
+    keys = ("eurostepper", "jev", "market")
+
+    def tally(rows: list[dict], key: str) -> dict:
+        marks = [r[key]["correct"] for r in rows if r[key] is not None and r[key]["correct"] is not None]
+        n, right = len(marks), sum(marks)
+        return {"correct": right, "total": n, "accuracy": round(right / n, 4) if n else None}
+
+    by_round: dict[tuple, list[dict]] = {}
+    for r in games:
+        by_round.setdefault((r["round"] or 0, r["roundName"]), []).append(r)
+    return {
+        "season": season,
+        "seasonLabel": season_label(season),
+        "summary": {k: tally(games, k) for k in keys},
+        "rounds": [{"round": rnd, "roundName": name, **{k: tally(rows, k) for k in keys}}
+                   for (rnd, name), rows in sorted(by_round.items(), key=lambda kv: kv[0][0], reverse=True)],
+        "games": games,
+    }
+
+
 @app.get("/api/games/{game_code}/rotation")
 def game_rotation(game_code: int, season: str = DEFAULT_SEASON) -> dict:
     """Who was on court when, rebuilt from the play-by-play (see stints.py)."""

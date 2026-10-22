@@ -1,6 +1,7 @@
 export const metadata = { title: "Predictions" };
 
 import { BacktestPanel, ChallengerPanel, MarketPanel, PaperTradingPanel, TrackRecord, UpcomingList } from "@/components/Predictions";
+import PredictionsToggle from "@/components/PredictionsToggle";
 import { getPredictions } from "@/lib/api";
 import { currentSeason } from "@/lib/season";
 
@@ -8,8 +9,11 @@ export default async function PredictionsPage() {
   const data = await getPredictions(await currentSeason());
   return (
     <div className="grid gap-8">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h1 className="text-2xl font-bold">Predictions</h1>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold">Predictions</h1>
+          <PredictionsToggle active="overview" />
+        </div>
         <span className="text-sm text-neutral-400">
           Win probabilities from power ratings, season efficiency and home court
         </span>
