@@ -467,9 +467,11 @@ export function ChallengerPanel({ data }: { data: PredictionsOverview }) {
       <p className="text-xs text-neutral-500">
         Jev is TypeSafe&apos;s decision model. Before each game it gets the same kind of facts our model
         uses (records, last five results, power ratings, season efficiency, home court) but never our
-        prediction, and answers which team wins with a probability for each side. Only calls made before
-        tip-off count. Log loss and Brier score reward well-judged probabilities (lower is better);
-        probabilities are capped at 1% and 99% for log loss so one certain miss can&apos;t dominate.
+        prediction, and answers “Will the home team win?” with a probability. Until 22 October it was
+        asked to pick the winner instead, which gave near-certain answers such as 100%; one graded game,
+        Hapoel Tel Aviv v Virtus Bologna, used that version. Only calls made before tip-off count. Log
+        loss and Brier score reward well-judged probabilities (lower is better); probabilities are capped
+        at 1% and 99% for log loss so one certain miss can&apos;t dominate.
       </p>
     </div>
   );

@@ -8,8 +8,14 @@ For each game in the next few days, Jev (TypeSafe's decision model, through
 Vercel AI Gateway) gets the same kind of facts our model uses: each team's
 record, last five results, power rating and season efficiency, who is at
 home, and the league's home-win rate. It never sees our prediction. It
-answers a choice question ("which team wins?") with a probability for each
-side; the facts sent are stored with the call.
+answers a yes/no question ("will the home team win?") with the probability
+of yes; the facts sent are stored with the call.
+
+Until 22 Oct 2026 Jev was asked to pick the winner (a choice question). Its
+answers were near-certain (half at 95%+ or 5%-, log loss 1.14 on this
+season's first 60 games, worse than a coin flip), while the yes/no question
+gave realistic probabilities (log loss 0.656, level with our model). One
+graded call, Hapoel v Virtus on 21 Oct, used the old question.
 
 Calls are rewritten on each run until tip-off, then frozen, exactly like
 predict.py, so only genuine pre-game calls are compared. Jev costs about
@@ -107,12 +113,12 @@ def ask_jev(key: str, state: str, home_name: str, away_name: str) -> dict:
         "model": MODEL,
         "state": state,
         "questions": {
-            "winner": {
-                "type": "choice",
-                "instructions": "Which team will win this game?",
+            "home_win": {
+                "type": "noul",
+                "instructions": f"Will {home_name} (the home team) win this game?",
                 "criteria": {
-                    "home": f"{home_name} (the home team) wins",
-                    "away": f"{away_name} (the away team) wins",
+                    "true": f"{home_name} (the home team) wins",
+                    "false": f"{away_name} (the away team) wins",
                 },
             }
         },
@@ -158,8 +164,7 @@ def run(session: Session, key: str, days: int) -> tuple[int, float]:
         )
         try:
             data = ask_jev(key, state, home_name, away_name)
-            answer = data["answers"]["winner"]
-            p_home = float(answer["probabilities"]["home"])
+            p_home = float(data["answers"]["home_win"]["noul"])
         except Exception as exc:  # keep any earlier call; try again next run
             log.warning("game %s (%s v %s) failed: %s", g.game_code, home, away, exc)
             continue
@@ -171,7 +176,7 @@ def run(session: Session, key: str, days: int) -> tuple[int, float]:
             season_code=season, game_code=g.game_code, provider=PROVIDER,
             model=str(data.get("model") or MODEL), made_at=now, utc_date=g.utc_date,
             home_club=home, away_club=away, home_win_prob=round(p_home, 4),
-            confidence=answer.get("confidence"), state=state[:1500], cost_usd=game_cost,
+            confidence=None, state=state[:1500], cost_usd=game_cost,  # yes/no answers carry no confidence
         ))
         session.commit()
         done += 1
