@@ -391,3 +391,79 @@ class GamePrediction(Base):
     home_court: Mapped[float] = mapped_column(Float)
     factors: Mapped[Optional[str]] = mapped_column(String(400))  # JSON: contribution per input
     model_version: Mapped[str] = mapped_column(String(40))
+
+
+class AiPrediction(Base):
+    """An outside AI model's pre-game call (see ai_challenger.py), stored next
+    to our own predictions for a fair comparison. Rewritten until tip-off,
+    then frozen; the facts sent are kept for transparency."""
+
+    __tablename__ = "ai_predictions"
+    __table_args__ = (UniqueConstraint("season_code", "game_code", "provider"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    season_code: Mapped[str] = mapped_column(String(8), index=True)
+    game_code: Mapped[int] = mapped_column(Integer)
+    provider: Mapped[str] = mapped_column(String(20))  # e.g. "jev"
+    model: Mapped[str] = mapped_column(String(60))
+    made_at: Mapped[datetime] = mapped_column(DateTime)
+    utc_date: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    home_club: Mapped[str] = mapped_column(String(8))
+    away_club: Mapped[str] = mapped_column(String(8))
+    home_win_prob: Mapped[float] = mapped_column(Float)
+    confidence: Mapped[Optional[float]] = mapped_column(Float)
+    state: Mapped[str] = mapped_column(String(1500))  # the facts the model was given
+    cost_usd: Mapped[Optional[float]] = mapped_column(Float)
+
+
+class MarketSnapshot(Base):
+    """A Polymarket moneyline price for a game at one moment (see market.py).
+    Prices are for the home team winning, as a share price in dollars."""
+
+    __tablename__ = "market_snapshots"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    season_code: Mapped[str] = mapped_column(String(8), index=True)
+    game_code: Mapped[int] = mapped_column(Integer, index=True)
+    market_id: Mapped[str] = mapped_column(String(20))
+    slug: Mapped[str] = mapped_column(String(120))
+    captured_at: Mapped[datetime] = mapped_column(DateTime)
+    game_start: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    home_price: Mapped[float] = mapped_column(Float)  # midway between bid and ask
+    home_bid: Mapped[Optional[float]] = mapped_column(Float)
+    home_ask: Mapped[Optional[float]] = mapped_column(Float)
+    home_last: Mapped[Optional[float]] = mapped_column(Float)
+    # average price paid to buy 100 shares from the order book at that moment
+    home_fill: Mapped[Optional[float]] = mapped_column(Float)
+    away_fill: Mapped[Optional[float]] = mapped_column(Float)
+    volume: Mapped[Optional[float]] = mapped_column(Float)
+    liquidity: Mapped[Optional[float]] = mapped_column(Float)
+    fees: Mapped[Optional[str]] = mapped_column(String(200))  # JSON fee schedule, if fees are on
+
+
+class PaperTrade(Base):
+    """A simulated bet (see market.py): at the last price saved before
+    tip-off, buy 100 shares of the side a model rates above the market,
+    filled from the order book; settled after the game. No real money."""
+
+    __tablename__ = "paper_trades"
+    __table_args__ = (UniqueConstraint("season_code", "game_code", "strategy"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    season_code: Mapped[str] = mapped_column(String(8), index=True)
+    game_code: Mapped[int] = mapped_column(Integer)
+    strategy: Mapped[str] = mapped_column(String(20))  # "eurostepper" or "jev"
+    entered_at: Mapped[datetime] = mapped_column(DateTime)
+    snapshot_at: Mapped[datetime] = mapped_column(DateTime)  # price used, always before tip-off
+    model_home_prob: Mapped[Optional[float]] = mapped_column(Float)
+    market_home_price: Mapped[float] = mapped_column(Float)
+    side: Mapped[Optional[str]] = mapped_column(String(4))  # "home", "away", or None when skipped
+    entry_price: Mapped[Optional[float]] = mapped_column(Float)
+    shares: Mapped[int] = mapped_column(Integer, default=100)
+    cost: Mapped[Optional[float]] = mapped_column(Float)
+    fee: Mapped[Optional[float]] = mapped_column(Float)  # Polymarket taker fee, if the market charges one
+    status: Mapped[str] = mapped_column(String(10))  # open, won, lost, skipped
+    note: Mapped[Optional[str]] = mapped_column(String(120))
+    payout: Mapped[Optional[float]] = mapped_column(Float)
+    pnl: Mapped[Optional[float]] = mapped_column(Float)
+    settled_at: Mapped[Optional[datetime]] = mapped_column(DateTime)

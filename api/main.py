@@ -22,6 +22,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "pipeline"))
 
 from euroleague_pipeline.models import (  # noqa: E402
+    AiPrediction,
     Award,
     Club,
     Game,
@@ -29,6 +30,8 @@ from euroleague_pipeline.models import (  # noqa: E402
     GameReferee,
     ImpactSeason,
     LineupStint,
+    MarketSnapshot,
+    PaperTrade,
     PbpEvent,
     PersonStint,
     PlayerGameStat,
@@ -984,6 +987,56 @@ def prediction_dict(p: GamePrediction, clubs: dict[str, Club], game: Optional[Ga
     return out
 
 
+AI_PROVIDER_LABEL = "Jev (TypeSafe)"
+CLIP = 0.01  # log loss with probabilities capped at 1% / 99%, so one certain miss can't dominate
+
+
+def ai_dict(a: AiPrediction, game: Optional[Game] = None) -> dict:
+    out = {"provider": AI_PROVIDER_LABEL, "model": a.model, "homeWinProb": a.home_win_prob,
+           "confidence": a.confidence, "madeAt": a.made_at.isoformat() + "Z", "facts": a.state}
+    if game is not None and game.played and game.local_score is not None:
+        out["correct"] = (a.home_win_prob > 0.5) == (game.local_score > game.road_score)
+        out["preGame"] = bool(a.utc_date and a.made_at < a.utc_date)
+    return out
+
+
+MARKET_SOURCE = "Polymarket"
+STRATEGIES = {"eurostepper": "Eurostepper", "jev": "Jev AI"}
+
+
+def market_dict(s: MarketSnapshot) -> dict:
+    return {"homePrice": s.home_price, "bid": s.home_bid, "ask": s.home_ask,
+            "capturedAt": s.captured_at.isoformat() + "Z", "volume": s.volume}
+
+
+def pre_game_prices(session, season: str, game_codes: Optional[list[int]] = None) -> dict[int, MarketSnapshot]:
+    """Each game's last Polymarket price saved before tip-off: the closing
+    price for played games, the latest one for games still to come (see
+    pipeline market.py)."""
+    last = (
+        select(MarketSnapshot.game_code, func.max(MarketSnapshot.captured_at).label("at"))
+        .join(Game, (Game.season_code == MarketSnapshot.season_code) & (Game.game_code == MarketSnapshot.game_code))
+        .where(MarketSnapshot.season_code == season, MarketSnapshot.captured_at < Game.utc_date)
+        .group_by(MarketSnapshot.game_code)
+    )
+    if game_codes is not None:
+        last = last.where(MarketSnapshot.game_code.in_(game_codes))
+    last = last.subquery()
+    rows = session.execute(
+        select(MarketSnapshot).join(last, (MarketSnapshot.game_code == last.c.game_code)
+                                    & (MarketSnapshot.captured_at == last.c.at))
+        .where(MarketSnapshot.season_code == season)
+    ).scalars()
+    return {s.game_code: s for s in rows}
+
+
+def trade_dict(t: PaperTrade) -> dict:
+    return {"strategy": t.strategy, "modelHomeProb": t.model_home_prob, "marketHomePrice": t.market_home_price,
+            "pricedAt": t.snapshot_at.isoformat() + "Z", "side": t.side, "price": t.entry_price,
+            "shares": t.shares, "cost": t.cost, "fee": t.fee, "status": t.status, "note": t.note,
+            "pnl": t.pnl}
+
+
 @app.get("/api/games/{game_code}/prediction")
 def game_prediction(game_code: int, season: str = DEFAULT_SEASON) -> dict:
     """The model's pre-game call for a game (see pipeline predict.py)."""
@@ -998,7 +1051,38 @@ def game_prediction(game_code: int, season: str = DEFAULT_SEASON) -> dict:
         game = session.execute(
             select(Game).where(Game.season_code == season, Game.game_code == game_code)
         ).scalar_one_or_none()
-        return {"available": True, **prediction_dict(p, load_clubs(session), game)}
+        ai = session.execute(
+            select(AiPrediction).where(AiPrediction.season_code == season, AiPrediction.game_code == game_code)
+        ).scalar_one_or_none()
+        price = pre_game_prices(session, season, [game_code]).get(game_code)
+        trades = session.execute(
+            select(PaperTrade).where(PaperTrade.season_code == season, PaperTrade.game_code == game_code)
+        ).scalars().all()
+        out = {"available": True, **prediction_dict(p, load_clubs(session), game)}
+        out["ai"] = ai_dict(ai, game) if ai else None
+        out["market"] = market_dict(price) if price else None
+        out["paperTrades"] = [trade_dict(t) for t in sorted(trades, key=lambda t: list(STRATEGIES).index(t.strategy))]
+        return out
+
+
+def next_round(schedule: list[Game], now: datetime) -> tuple[set[int], Optional[str]]:
+    """Games still to tip off in the round being played now, or else in the
+    next round, plus any postponed game fitted in before that round ends."""
+    ahead = [g for g in schedule if not g.played and g.utc_date and g.utc_date > now and g.round is not None]
+    if not ahead:
+        return set(), None
+    started = [g.round for g in schedule if g.round is not None and g.utc_date and g.utc_date <= now]
+    current = max(started) if started else None
+    rounds = {g.round for g in ahead}
+    if current in rounds:
+        target = current
+    else:
+        later = [r for r in rounds if current is None or r > current]
+        target = min(later) if later else min(rounds)
+    chosen = [g for g in ahead if g.round == target]
+    last = max(g.utc_date for g in chosen)
+    chosen += [g for g in ahead if g.round < target and g.utc_date <= last]
+    return {g.game_code for g in chosen}, chosen[0].round_name
 
 
 @app.get("/api/predictions")
@@ -1019,9 +1103,30 @@ def predictions_overview(season: str = DEFAULT_SEASON) -> dict:
         backtest = session.execute(
             select(GamePrediction).where(GamePrediction.backtest.is_(True))
         ).scalars().all()
+        ai_calls = {
+            (a.season_code, a.game_code): a
+            for a in session.execute(select(AiPrediction).where(AiPrediction.season_code == season)).scalars()
+        }
+        prices = pre_game_prices(session, season)
+        shown, round_name = next_round(
+            session.execute(select(Game).where(Game.season_code == season)).scalars().all(), now)
+        trades = session.execute(select(PaperTrade).where(PaperTrade.season_code == season)).scalars().all()
+        traded_games = {
+            g.game_code: g
+            for g in session.execute(
+                select(Game).where(Game.season_code == season, Game.game_code.in_({t.game_code for t in trades}))
+            ).scalars()
+        }
 
-    upcoming = [prediction_dict(p, clubs) for p in live
-                if p.utc_date and p.utc_date > now and (p.utc_date - now).days < 8]
+    upcoming = []
+    for p in live:
+        if p.game_code in shown and p.utc_date and p.utc_date > now:
+            item = prediction_dict(p, clubs)
+            a = ai_calls.get((p.season_code, p.game_code))
+            item["ai"] = ai_dict(a) if a else None
+            price = prices.get(p.game_code)
+            item["market"] = market_dict(price) if price else None
+            upcoming.append(item)
     graded = []
     for p in live:
         g = games.get((p.season_code, p.game_code))
@@ -1038,6 +1143,26 @@ def predictions_overview(season: str = DEFAULT_SEASON) -> dict:
         brier = sum((p - won) ** 2 for p, won in items) / n
         return {"games": n, "correct": correct, "accuracy": round(correct / n, 4),
                 "logLoss": round(ll, 4), "brier": round(brier, 4)}
+
+    head_to_head = []
+    for d in graded:
+        a = ai_calls.get((d["season"], d["gameCode"]))
+        if a is not None and a.utc_date and a.made_at < a.utc_date:
+            head_to_head.append({**d, "ai": {"homeWinProb": a.home_win_prob, "confidence": a.confidence}})
+
+    def clipped(items: list[tuple[float, bool]]) -> dict:
+        return score([(min(max(p, CLIP), 1 - CLIP), won) for p, won in items])
+
+    challenger = {
+        "provider": AI_PROVIDER_LABEL,
+        "games": len(head_to_head),
+        "ours": clipped([(d["homeWinProb"], d["result"]["homeScore"] > d["result"]["awayScore"]) for d in head_to_head]),
+        "ai": clipped([(d["ai"]["homeWinProb"], d["result"]["homeScore"] > d["result"]["awayScore"]) for d in head_to_head]),
+        "recent": head_to_head[:40],
+        "upcomingCalls": sum(1 for u in upcoming if u.get("ai")),
+    }
+
+    market = market_overview(graded, ai_calls, prices, trades, traded_games, clubs, upcoming, clipped)
 
     record = score([(d["homeWinProb"], d["result"]["homeScore"] > d["result"]["awayScore"]) for d in graded])
     elo_record = score([(d["eloHomeProb"], d["result"]["homeScore"] > d["result"]["awayScore"]) for d in graded])
@@ -1064,9 +1189,12 @@ def predictions_overview(season: str = DEFAULT_SEASON) -> dict:
     return {
         "season": season,
         "upcoming": upcoming,
+        "upcomingRound": round_name,
         "record": record,
         "eloRecord": elo_record,
         "recent": graded[:40],
+        "challenger": challenger,
+        "market": market,
         "backtest": {
             "model": score(model_items),
             "elo": score(elo_items),
@@ -1077,6 +1205,85 @@ def predictions_overview(season: str = DEFAULT_SEASON) -> dict:
             "seasons": [{"season": s, "seasonLabel": season_label(s), **score(items)} for s, items in sorted(by_season.items())],
             "calibration": calibration,
         },
+    }
+
+
+def market_overview(graded: list[dict], ai_calls: dict, prices: dict[int, MarketSnapshot],
+                    trades: list[PaperTrade], traded_games: dict[int, Game], clubs: dict[str, Club],
+                    upcoming: list[dict], clipped) -> dict:
+    """Both models against Polymarket's closing price, and the paper trades."""
+    def home_won(d: dict) -> bool:
+        return d["result"]["homeScore"] > d["result"]["awayScore"]
+
+    # games with all three pre-game numbers: ours, Jev's and the market's
+    priced = []
+    for d in graded:
+        a = ai_calls.get((d["season"], d["gameCode"]))
+        price = prices.get(d["gameCode"])
+        if price is not None and a is not None and a.utc_date and a.made_at < a.utc_date:
+            priced.append((d, d["homeWinProb"], a.home_win_prob, price.home_price))
+
+    def disagreements(i: int) -> dict:
+        """Games where model i (0 ours, 1 Jev) and the market picked different winners."""
+        rows = [(probs[i], probs[2], home_won(d)) for d, *probs in priced]
+        split = [(p, won) for p, m, won in rows if (p > 0.5) != (m > 0.5)]
+        return {"games": len(split), "right": sum((p > 0.5) == won for p, won in split)}
+
+    summaries = []
+    for key, label in STRATEGIES.items():
+        mine = [t for t in trades if t.strategy == key]
+        settled = [t for t in mine if t.status in ("won", "lost")]
+        opened = [t for t in mine if t.status == "open"]
+        staked = sum(t.cost or 0 for t in settled)
+        fees = sum(t.fee or 0 for t in settled)
+        pnl = sum(t.pnl or 0 for t in settled)
+        summaries.append({
+            "key": key, "label": label,
+            "trades": len(settled) + len(opened), "settled": len(settled),
+            "won": sum(t.status == "won" for t in settled), "lost": sum(t.status == "lost" for t in settled),
+            "open": len(opened), "openStake": round(sum((t.cost or 0) + (t.fee or 0) for t in opened), 2),
+            "skipped": sum(t.status == "skipped" for t in mine),
+            "homeBuys": sum(t.side == "home" for t in settled + opened),
+            "awayBuys": sum(t.side == "away" for t in settled + opened),
+            "staked": round(staked, 2), "fees": round(fees, 2), "pnl": round(pnl, 2),
+            "roi": round(pnl / (staked + fees), 4) if settled else None,
+        })
+
+    by_game: dict[int, dict] = {}
+    for t in trades:
+        g = traded_games.get(t.game_code)
+        if g is None:
+            continue
+        row = by_game.setdefault(t.game_code, {
+            "gameCode": g.game_code, "utcDate": g.utc_date.isoformat() + "Z" if g.utc_date else None,
+            "home": club_badge(clubs, g.local_club_code), "away": club_badge(clubs, g.road_club_code),
+            "result": ({"homeScore": g.local_score, "awayScore": g.road_score}
+                       if g.played and g.local_score is not None else None),
+            "marketHomePrice": t.market_home_price, "pricedAt": t.snapshot_at.isoformat() + "Z",
+            "trades": {},
+        })
+        row["trades"][t.strategy] = trade_dict(t)
+    ledger = sorted(by_game.values(), key=lambda r: r["utcDate"] or "", reverse=True)
+
+    series, running = [], {key: 0.0 for key in STRATEGIES}
+    for row in reversed(ledger):
+        done = {k: t for k, t in row["trades"].items() if t["status"] in ("won", "lost")}
+        if not done:
+            continue
+        for k, t in done.items():
+            running[k] += t["pnl"] or 0
+        series.append({"gameCode": row["gameCode"], "label": f"{row['home']['clubCode']} v {row['away']['clubCode']}",
+                       **{k: round(v, 2) for k, v in running.items()}})
+
+    return {
+        "source": MARKET_SOURCE,
+        "games": len(priced),
+        "ours": clipped([(p, home_won(d)) for d, p, _, _ in priced]),
+        "ai": clipped([(p, home_won(d)) for d, _, p, _ in priced]),
+        "market": clipped([(m, home_won(d)) for d, _, _, m in priced]),
+        "disagree": {"ours": disagreements(0), "ai": disagreements(1)},
+        "upcomingPriced": sum(1 for u in upcoming if u.get("market")),
+        "paper": {"shares": 100, "strategies": summaries, "games": ledger[:60], "series": series},
     }
 
 
