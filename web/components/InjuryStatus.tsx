@@ -35,6 +35,12 @@ export function isMedical(e: InjuryEntry): boolean {
   return (e.reason === "injury" || e.reason === "illness") && e.status !== "Ready";
 }
 
+/** Missing games or at risk of it: injured or ill, or ruled out for any
+    other reason (a coach's decision, a suspension). */
+export function isUnavailable(e: InjuryEntry): boolean {
+  return isMedical(e) || e.status === "Out";
+}
+
 /** Whether a report entry still applies to a regular-season round: absences
     whose stated last round is before it are assumed over. */
 export function appliesToRound(e: InjuryEntry, round: number | null): boolean {

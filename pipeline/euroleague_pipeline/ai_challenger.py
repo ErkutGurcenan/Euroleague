@@ -119,7 +119,7 @@ def injury_notes(path: Path, now: datetime) -> dict[str, str]:
     day = f"{updated.day} {updated:%b}"
     by_club: dict[str, list[str]] = defaultdict(list)
     for e in report.get("entries", []):
-        if e.get("status") in INJURY_STATUS and e.get("reason") in ("injury", "illness"):
+        if e.get("status") in INJURY_STATUS and (e.get("reason") in ("injury", "illness") or e.get("status") == "Out"):
             what = e["note"].split(";")[0][:60]
             by_club[e["club"]].append(f"{e['player']} {INJURY_STATUS[e['status']]} ({what})")
     clubs = {e["club"] for e in report.get("entries", [])} | set(by_club)

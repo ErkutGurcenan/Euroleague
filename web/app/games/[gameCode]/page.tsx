@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import Headshot from "@/components/Headshot";
 import HeadToHead from "@/components/HeadToHead";
-import { appliesToRound, isMedical, StatusPill, timeline } from "@/components/InjuryStatus";
+import { appliesToRound, isUnavailable, StatusPill, timeline } from "@/components/InjuryStatus";
 import { PredictionCard } from "@/components/Predictions";
 import RotationChart from "@/components/RotationChart";
 import ShotChart from "@/components/ShotChart";
@@ -182,7 +182,7 @@ export default async function GamePage({
           injuryReport.entries.filter(
             (e) =>
               e.club === side.club?.code &&
-              isMedical(e) &&
+              isUnavailable(e) &&
               appliesToRound(e, game.phaseType === "RS" ? game.round : null),
           ),
         )

@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import FranchiseHistory from "@/components/FranchiseHistory";
 import GameCard from "@/components/GameCard";
 import Headshot from "@/components/Headshot";
-import { isMedical, StatusPill } from "@/components/InjuryStatus";
+import { isUnavailable, StatusPill } from "@/components/InjuryStatus";
 import ShotChartExplorer from "@/components/ShotChartExplorer";
 import LineupsPanel from "@/components/LineupsPanel";
 import { OnOffRanking } from "@/components/OnOff";
@@ -64,7 +64,7 @@ export default async function TeamPage({
   const upcoming = games.filter((g) => !g.played);
   const injured =
     injuryReport && (!season || season === injuryReport.season)
-      ? injuryReport.entries.filter((e) => e.club === club.code && isMedical(e))
+      ? injuryReport.entries.filter((e) => e.club === club.code && isUnavailable(e))
       : [];
 
   return (
