@@ -11,8 +11,7 @@ import { getMeta } from "@/lib/api";
 const GITHUB_REPO = "https://github.com/ErkutGurcenan/Euroleague";
 const GITHUB_PROFILE = "https://github.com/ErkutGurcenan";
 const ORACLENBA = "https://oraclenba.com";
-const BASKETNEWS_REPORT =
-  "https://basketnews.com/news-212393-euroleague-injury-report-updated.html";
+const INJURY_LIST = "https://basketballsphere.com/en/injuries/euroleague/";
 
 const SECTIONS = [
   { href: "/standings", title: "Standings & games", text: "Tables round by round, results, box scores and shot charts for every game." },
@@ -118,10 +117,9 @@ export default async function AboutPage() {
             night{lastGame ? ` (latest game: ${lastGame})` : ""}.
           </li>
           <li>
-            <span className="font-medium text-neutral-100">Injury report</span>{" "}
-            summarized from the{" "}
-            <ExternalLink href={BASKETNEWS_REPORT}>BasketNews EuroLeague Injury Report</ExternalLink>
-            , credited wherever it&apos;s shown.
+            <span className="font-medium text-neutral-100">Injury list</span>{" "}
+            from <ExternalLink href={INJURY_LIST}>BasketballSphere</ExternalLink>
+            {"'s EuroLeague injury page, checked three times a day and credited wherever it's shown."}
           </li>
           <li>
             <span className="font-medium text-neutral-100">Season awards</span>{" "}
