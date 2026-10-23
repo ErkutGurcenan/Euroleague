@@ -30,7 +30,7 @@ ROUNDS = re.compile(r"^(\d+|\d+-\d+|Season|Indefinitely|Long-term)$")
 FIELDS = {"club", "player", "pos", "status", "reason", "rounds", "note"}
 
 
-def validate(report: dict) -> list[str]:
+def validate(report: dict, db: Path = DB) -> list[str]:
     errors = []
     for key in ("season", "source", "sourceUrl", "sourceUpdated", "entries"):
         if key not in report:
@@ -41,7 +41,7 @@ def validate(report: dict) -> list[str]:
         datetime.strptime(report["sourceUpdated"], "%Y-%m-%dT%H:%M")
     except ValueError:
         errors.append(f"sourceUpdated must look like 2026-10-15T14:00: {report['sourceUpdated']!r}")
-    with sqlite3.connect(DB) as conn:
+    with sqlite3.connect(db) as conn:
         clubs = {
             r[0]
             for r in conn.execute(

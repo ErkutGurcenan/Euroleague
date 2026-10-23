@@ -2,7 +2,7 @@ export const metadata = { title: "Injury report" };
 
 import Link from "next/link";
 import Headshot from "@/components/Headshot";
-import { isMedical, StatusPill, timeline } from "@/components/InjuryStatus";
+import { isUnavailable, StatusPill, timeline } from "@/components/InjuryStatus";
 import { getInjuries, type InjuryEntry } from "@/lib/api";
 import { seasonLabel } from "@/lib/season";
 
@@ -62,9 +62,9 @@ function SummaryTile({ label, value, sub }: { label: string; value: number; sub:
 
 export default async function InjuriesPage() {
   const report = await getInjuries();
-  const injured = report.entries.filter(isMedical);
+  const injured = report.entries.filter(isUnavailable);
   const cleared = report.entries.filter((e) => e.status === "Ready");
-  const other = report.entries.filter((e) => !isMedical(e) && e.status !== "Ready");
+  const other = report.entries.filter((e) => !isUnavailable(e) && e.status !== "Ready");
 
   const byClub = new Map<string, InjuryEntry[]>();
   for (const e of injured) byClub.set(e.club, [...(byClub.get(e.club) ?? []), e]);
@@ -91,7 +91,7 @@ export default async function InjuriesPage() {
             rel="noopener noreferrer"
             className="text-orange-400 hover:underline"
           >
-            BasketNews ↗
+            {report.source} ↗
           </a>
         </span>
       </div>
@@ -100,12 +100,12 @@ export default async function InjuriesPage() {
         <SummaryTile
           label="Ruled out"
           value={injured.filter((e) => e.status === "Out").length}
-          sub="injured or ill, will not play"
+          sub="will not play"
         />
         <SummaryTile
           label="Day-to-day"
           value={injured.filter((e) => e.status !== "Out").length}
-          sub="injured, availability unclear"
+          sub="availability unclear"
         />
         <SummaryTile
           label="Cleared to return"
@@ -115,7 +115,7 @@ export default async function InjuriesPage() {
       </div>
 
       <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-neutral-300">
-        Injured &amp; ill
+        Out or doubtful
       </h2>
       <div className="mb-8 grid gap-4 lg:grid-cols-2">
         {clubs.map((entries) => (
@@ -228,16 +228,16 @@ export default async function InjuriesPage() {
       </details>
 
       <p className="text-xs text-neutral-500">
-        Player status is summarized from the{" "}
+        {"Player status comes from "}
         <a
           href={report.sourceUrl}
           target="_blank"
           rel="noopener noreferrer"
           className="text-neutral-400 hover:text-orange-400"
         >
-          BasketNews EuroLeague Injury Report
+          {report.source}
         </a>
-        . Games missed and last appearances come from official EuroLeague box
+        {"'s EuroLeague injury list, checked three times a day. "}Games missed and last appearances come from official EuroLeague box
         scores. &quot;Round&quot; is the round the status applies to;
         &quot;Through Round N&quot; is the expected end of an absence.
       </p>

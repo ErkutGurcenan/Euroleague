@@ -15,6 +15,7 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     String,
+    Text,
     UniqueConstraint,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -412,7 +413,7 @@ class AiPrediction(Base):
     away_club: Mapped[str] = mapped_column(String(8))
     home_win_prob: Mapped[float] = mapped_column(Float)
     confidence: Mapped[Optional[float]] = mapped_column(Float)
-    state: Mapped[str] = mapped_column(String(1500))  # the facts the model was given
+    state: Mapped[str] = mapped_column(String(2500))  # the facts the model was given
     cost_usd: Mapped[Optional[float]] = mapped_column(Float)
 
 
@@ -467,3 +468,18 @@ class PaperTrade(Base):
     payout: Mapped[Optional[float]] = mapped_column(Float)
     pnl: Mapped[Optional[float]] = mapped_column(Float)
     settled_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+
+
+class InjurySnapshot(Base):
+    """One read of the injury list (see injury_feed.py), kept every time so
+    real injury reports can be tested against results later."""
+
+    __tablename__ = "injury_snapshots"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    season_code: Mapped[str] = mapped_column(String(8), index=True)
+    fetched_at: Mapped[datetime] = mapped_column(DateTime)
+    source: Mapped[str] = mapped_column(String(60))
+    source_updated: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    entries: Mapped[str] = mapped_column(Text)  # JSON rows as read: club, player, status, injury, expected return
+    changed: Mapped[bool] = mapped_column(Boolean)  # differs from the previous read

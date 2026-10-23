@@ -1,5 +1,25 @@
 # Updating the injury report
 
+**Automatic since October 2026.** `python -m euroleague_pipeline.injury_feed`
+reads BasketballSphere's EuroLeague injury page
+(https://basketballsphere.com/en/injuries/euroleague/) at 10:00, 14:00 and
+17:00 UK time (cron, log `~/ingest-logs/injuries.log`). The site allows
+automatic reading and is credited wherever the list is shown. Each run saves
+the rows as read in the `injury_snapshots` table (every read, for testing
+injuries against results later), and when the list changed it validates and
+installs `db/injuries.json`, then asks Jev again about upcoming games so its
+calls include the new list. `--dry-run` prints the list without saving
+anything. BasketballSphere's own "updated" stamp is not always changed when
+the list is, so `sourceUpdated` is when we first saw the current list.
+
+Sources we must not read automatically: Rotowire (its terms forbid automated
+access, copying and AI extraction) and BasketNews (Cloudflare bot protection).
+
+The manual procedure below, from the BasketNews article, is kept as a
+fallback in case BasketballSphere stops publishing.
+
+## Manual fallback: BasketNews
+
 The EuroLeague API has no injury data. Eurostepper's injury report is a
 summary of the BasketNews EuroLeague Injury Report, credited and linked on
 every page that uses it:

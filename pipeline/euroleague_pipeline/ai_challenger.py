@@ -7,7 +7,9 @@ Usage:
 For each game in the next few days, Jev (TypeSafe's decision model, through
 Vercel AI Gateway) gets the same kind of facts our model uses: each team's
 record, last five results, power rating and season efficiency, who is at
-home, and the league's home-win rate. It never sees our prediction. It
+home, and the league's home-win rate, plus each team's injured players from
+the latest injury list (db/injuries.json, see injury_feed.py; left out when
+older than 4 days). It never sees our prediction. It
 answers a yes/no question ("will the home team win?") with the probability
 of yes; the facts sent are stored with the call.
 
@@ -27,6 +29,7 @@ Needs an AI Gateway key in AI_GATEWAY_API_KEY or in
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import os
 import sys
@@ -39,6 +42,7 @@ from sqlalchemy import create_engine, delete, func, select
 from sqlalchemy.orm import Session
 
 from .ingest import DEFAULT_DB
+from .injuries_check import LIVE as INJURIES
 from .models import AiPrediction, Base, Club, Game, PlayerGameStat
 from .simulate import current_ratings
 
@@ -49,6 +53,8 @@ MODEL = "typesafe-ai/jev"
 PROVIDER = "jev"
 KEY_FILE = Path.home() / ".config" / "eurostepper" / "ai_gateway.env"
 HOME_WIN_RATE = "62%"  # home teams' share of wins since 2016-17
+INJURY_MAX_AGE = timedelta(days=4)
+INJURY_STATUS = {"Out": "out", "Doubtful": "doubtful", "Game-time": "game-time decision"}
 
 
 def load_key() -> str | None:
@@ -100,12 +106,37 @@ def team_facts(session: Session, season: str) -> dict[str, dict]:
     return facts
 
 
-def describe(name: str, side: str, f: dict, rating: float) -> str:
+def injury_notes(path: Path, now: datetime) -> dict[str, str]:
+    """Per club, one sentence on its injured players from the live injury
+    list; empty when the list is missing or older than INJURY_MAX_AGE."""
+    try:
+        report = json.loads(path.read_text())
+        updated = datetime.strptime(report["sourceUpdated"], "%Y-%m-%dT%H:%M")
+    except (OSError, ValueError, KeyError):
+        return {}
+    if now - updated > INJURY_MAX_AGE:
+        return {}
+    day = f"{updated.day} {updated:%b}"
+    by_club: dict[str, list[str]] = defaultdict(list)
+    for e in report.get("entries", []):
+        if e.get("status") in INJURY_STATUS and (e.get("reason") in ("injury", "illness") or e.get("status") == "Out"):
+            what = e["note"].split(";")[0][:60]
+            by_club[e["club"]].append(f"{e['player']} {INJURY_STATUS[e['status']]} ({what})")
+    clubs = {e["club"] for e in report.get("entries", [])} | set(by_club)
+    notes = defaultdict(lambda: f"Injury report ({day}): no injured players listed.")
+    for club in clubs:
+        if by_club.get(club):
+            notes[club] = f"Injury report ({day}): " + "; ".join(by_club[club]) + "."
+    return notes
+
+
+def describe(name: str, side: str, f: dict, rating: float, injuries: str = "") -> str:
     net = 100 * (f["pf"] - f["pa"]) / f["poss"] if f["poss"] else 0.0
     last5 = " ".join(f["results"][-5:]) or "no games yet"
     return (f"{side} team: {name}. Record this season {f['wins']}-{f['losses']}. "
             f"Last five results (oldest first): {last5}. Power rating {rating:.0f} "
-            f"(1500 is league average). Net rating {net:+.1f} points per 100 possessions this season.")
+            f"(1500 is league average). Net rating {net:+.1f} points per 100 possessions this season."
+            + (f" {injuries}" if injuries else ""))
 
 
 def ask_jev(key: str, state: str, home_name: str, away_name: str) -> dict:
@@ -134,7 +165,7 @@ def ask_jev(key: str, state: str, home_name: str, away_name: str) -> dict:
     raise RuntimeError("no response")
 
 
-def run(session: Session, key: str, days: int) -> tuple[int, float]:
+def run(session: Session, key: str, days: int, injuries_path: Path = INJURIES) -> tuple[int, float]:
     season = session.execute(select(func.max(Game.season_code))).scalar()
     now = datetime.utcnow()
     games = session.execute(
@@ -149,6 +180,7 @@ def run(session: Session, key: str, days: int) -> tuple[int, float]:
     codes = sorted({g.local_club_code for g in games} | {g.road_club_code for g in games})
     ratings = current_ratings(session, season, codes)
     label = f"{season[1:]}-{str(int(season[1:]) + 1)[-2:]}"
+    injuries = injury_notes(injuries_path, now)
 
     done, cost = 0, 0.0
     for g in games:
@@ -159,8 +191,8 @@ def run(session: Session, key: str, days: int) -> tuple[int, float]:
         state = (
             f"EuroLeague basketball, {label} season, {g.round_name or 'game'}, played on {where}. "
             f"Home teams win about {HOME_WIN_RATE} of EuroLeague games. "
-            + describe(home_name, "Home", facts[home], ratings[home]) + " "
-            + describe(away_name, "Away", facts[away], ratings[away])
+            + describe(home_name, "Home", facts[home], ratings[home], injuries.get(home, "")) + " "
+            + describe(away_name, "Away", facts[away], ratings[away], injuries.get(away, ""))
         )
         try:
             data = ask_jev(key, state, home_name, away_name)
@@ -176,7 +208,7 @@ def run(session: Session, key: str, days: int) -> tuple[int, float]:
             season_code=season, game_code=g.game_code, provider=PROVIDER,
             model=str(data.get("model") or MODEL), made_at=now, utc_date=g.utc_date,
             home_club=home, away_club=away, home_win_prob=round(p_home, 4),
-            confidence=None, state=state[:1500], cost_usd=game_cost,  # yes/no answers carry no confidence
+            confidence=None, state=state[:2500], cost_usd=game_cost,  # yes/no answers carry no confidence
         ))
         session.commit()
         done += 1
@@ -188,6 +220,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--db", type=Path, default=DEFAULT_DB)
     parser.add_argument("--days", type=int, default=8, help="predict games starting within this many days")
+    parser.add_argument("--injuries", type=Path, default=INJURIES, help="the live injury list")
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     key = load_key()
@@ -197,7 +230,7 @@ def main(argv: list[str] | None = None) -> int:
     engine = create_engine(f"sqlite:///{args.db}")
     Base.metadata.create_all(engine)
     with Session(engine) as session:
-        n, cost = run(session, key, args.days)
+        n, cost = run(session, key, args.days, injuries_path=args.injuries)
     log.info("recorded %d Jev calls, cost $%.6f", n, cost)
     return 0
 

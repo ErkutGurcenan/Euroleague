@@ -396,10 +396,14 @@ def name_matches(source: list[str], lt: list[str], ft: list[str]) -> bool:
     return not ft or not source or ft[0][0] == source[0][0]
 
 
+POSITION_LETTER = {1: "G", 2: "F", 3: "C"}
+
+
 @app.get("/api/injuries")
 def injuries() -> dict:
-    """Current injury report (editorial file, see pipeline/data/injuries.json)
-    enriched with person codes, headshots and games missed from our data."""
+    """Current injury report (db/injuries.json, read from BasketballSphere by
+    pipeline injury_feed.py) enriched with person codes, headshots, positions
+    and games missed from our data."""
     report = json.loads(injuries_path().read_text())
     season = report["season"]
     with Session(engine) as session:
@@ -407,14 +411,17 @@ def injuries() -> dict:
         # (person_code, club, season, surname tokens, first-name tokens)
         people: list[tuple] = []
         images: dict[str, str] = {}
-        for code, name, club_code, season_code, image in session.execute(
+        positions: dict[str, str] = {}
+        for code, name, club_code, season_code, image, position in session.execute(
             select(PersonStint.person_code, PersonStint.name, PersonStint.club_code,
-                   PersonStint.season_code, PersonStint.image_url)
+                   PersonStint.season_code, PersonStint.image_url, PersonStint.position)
             .where(PersonStint.type == "J")
             .order_by(PersonStint.season_code.desc())
         ):
             if image:
                 images.setdefault(code, image)
+            if position in POSITION_LETTER:
+                positions.setdefault(code, POSITION_LETTER[position])
             if name:
                 people.append((code, club_code, season_code, *split_db_name(name)))
         by_club: dict[str, list[tuple]] = {}
@@ -475,6 +482,7 @@ def injuries() -> dict:
                 missed += 1
             entries.append({
                 **e,
+                "pos": e.get("pos") or (positions.get(person_code, "") if person_code else ""),
                 "personCode": person_code,
                 "imageUrl": image,
                 "clubName": club.name if club else e["club"],
