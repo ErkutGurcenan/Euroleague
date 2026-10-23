@@ -42,14 +42,14 @@ export default function LineupsPanel({ data }: { data: LineupsData }) {
   return (
     <div className="grid gap-3">
       <div className="flex flex-wrap items-center gap-3">
-        <span className="flex overflow-hidden rounded-md border border-neutral-700" role="group" aria-label="Lineup size">
+        <span className="flex shrink-0 overflow-hidden rounded-md border border-neutral-700" role="group" aria-label="Lineup size">
           {SIZES.map((s) => (
             <button key={s.key} type="button" aria-pressed={size === s.key} onClick={() => setSize(s.key)} className={toggle(size === s.key)}>
               {s.label}
             </button>
           ))}
         </span>
-        <span className="flex overflow-hidden rounded-md border border-neutral-700" role="group" aria-label="Sort lineups">
+        <span className="flex shrink-0 overflow-hidden rounded-md border border-neutral-700" role="group" aria-label="Sort lineups">
           <button type="button" aria-pressed={sort === "minutes"} onClick={() => setSort("minutes")} className={toggle(sort === "minutes")}>
             Most used
           </button>
