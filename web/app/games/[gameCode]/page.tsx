@@ -445,7 +445,7 @@ export default async function GamePage({
               rel="noopener noreferrer"
               className="text-neutral-400 hover:text-orange-400"
             >
-              BasketNews
+              {injuryReport.source}
             </a>
             .
           </p>
