@@ -30,8 +30,11 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/python -m euroleague_pipeline.seed_awards
 # Keep the current season fresh (run nightly from cron; also re-applies awards):
 ./refresh.sh
-# The injury report is editorial (db/injuries.json, live; see pipeline/INJURY_UPDATES.md),
-# summarized from the BasketNews EuroLeague Injury Report (the API has no injuries).
+# Polymarket prices and paper trades (cron every 15 minutes, at :13 :28 :43 :58):
+.venv/bin/python -m euroleague_pipeline.market
+# Injury list, read automatically from BasketballSphere (the API has no injuries;
+# cron at 10:00, 14:00 and 17:00 UK time; see pipeline/INJURY_UPDATES.md):
+.venv/bin/python -m euroleague_pipeline.injury_feed
 
 # 2. Run the API (http://localhost:8000)
 cd ../api
