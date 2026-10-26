@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import FranchiseHistory from "@/components/FranchiseHistory";
 import GameCard from "@/components/GameCard";
 import Headshot from "@/components/Headshot";
-import { isUnavailable, StatusPill } from "@/components/InjuryStatus";
+import { isUnavailable, noteText, StatusPill } from "@/components/InjuryStatus";
 import ShotChartExplorer from "@/components/ShotChartExplorer";
 import LineupsPanel from "@/components/LineupsPanel";
 import { OnOffRanking } from "@/components/OnOff";
@@ -203,7 +203,7 @@ export default async function TeamPage({
                       e.player
                     )}
                   </div>
-                  <div className="truncate text-xs text-neutral-400">{e.note}</div>
+                  <div className="truncate text-xs text-neutral-400">{noteText(e.note)}</div>
                 </div>
                 <StatusPill status={e.status} />
               </li>

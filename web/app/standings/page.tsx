@@ -125,7 +125,8 @@ export default async function StandingsPage({
                         className="h-5 w-5 object-contain"
                       />
                     )}
-                    {row.club.name}
+                    <span className="sm:hidden">{row.club.abbreviatedName ?? row.club.name}</span>
+                    <span className="hidden sm:inline">{row.club.name}</span>
                   </Link>
                 </td>
                 <td className="px-3 py-2 text-right font-medium">

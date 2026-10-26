@@ -2,7 +2,7 @@ export const metadata = { title: "Injury report" };
 
 import Link from "next/link";
 import Headshot from "@/components/Headshot";
-import { isUnavailable, StatusPill, timeline } from "@/components/InjuryStatus";
+import { isUnavailable, noteAndTimeline, noteText, StatusPill, timeline } from "@/components/InjuryStatus";
 import { getInjuries, type InjuryEntry } from "@/lib/api";
 import { seasonLabel } from "@/lib/season";
 
@@ -144,7 +144,7 @@ export default async function InjuriesPage() {
                         <StatusPill status={e.status} />
                       </span>
                     </div>
-                    <div className="text-sm text-neutral-300">{e.note}</div>
+                    {noteText(e.note) && <div className="text-sm text-neutral-300">{noteText(e.note)}</div>}
                     <div className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-neutral-500">
                       <span className="text-neutral-400">{timeline(e.rounds)}</span>
                       {availability(e) && <span>{availability(e)}</span>}
@@ -174,7 +174,7 @@ export default async function InjuriesPage() {
                     <PlayerName e={e} />
                     <span className="text-xs text-neutral-500">{e.club}</span>
                   </div>
-                  <div className="truncate text-xs text-neutral-400">{e.note}</div>
+                  <div className="truncate text-xs text-neutral-400">{noteText(e.note)}</div>
                 </div>
                 <StatusPill status={e.status} />
               </li>
@@ -218,7 +218,7 @@ export default async function InjuriesPage() {
                     {REASON_LABELS[e.reason]}
                   </td>
                   <td className="px-3 py-2 text-neutral-400">
-                    {e.note} · {timeline(e.rounds)}
+                    {noteAndTimeline(e)}
                   </td>
                 </tr>
               ))}

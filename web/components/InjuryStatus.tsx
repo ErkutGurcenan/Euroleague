@@ -31,6 +31,16 @@ export function timeline(rounds: string): string {
   return rounds;
 }
 
+/** The note, or "" when the source gave no description (just a dash). */
+export function noteText(note: string): string {
+  return /^[\s\-–—]*$/.test(note) ? "" : note;
+}
+
+/** Note and timeline on one line, skipping an empty note. */
+export function noteAndTimeline(e: InjuryEntry): string {
+  return [noteText(e.note), timeline(e.rounds)].filter(Boolean).join(" · ");
+}
+
 export function isMedical(e: InjuryEntry): boolean {
   return (e.reason === "injury" || e.reason === "illness") && e.status !== "Ready";
 }
