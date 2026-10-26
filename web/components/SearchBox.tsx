@@ -55,7 +55,7 @@ export default function SearchBox() {
   const hasResults = results.clubs.length > 0 || results.players.length > 0;
 
   return (
-    <div ref={boxRef} className="relative">
+    <div ref={boxRef} className="relative min-w-0">
       <input
         type="search"
         value={query}
@@ -63,7 +63,7 @@ export default function SearchBox() {
         onChange={(e) => setQuery(e.target.value)}
         onFocus={() => query.trim().length >= 2 && setOpen(true)}
         onKeyDown={(e) => e.key === "Escape" && setOpen(false)}
-        className="w-44 rounded-md border border-neutral-700 bg-neutral-900 px-2.5 py-1.5 text-sm placeholder-neutral-500 outline-none transition-all focus:w-64 focus:border-orange-600 sm:w-56"
+        className="w-44 max-w-full rounded-md border border-neutral-700 bg-neutral-900 px-2.5 py-1.5 text-sm placeholder-neutral-500 outline-none transition-all focus:w-64 focus:border-orange-600 sm:w-56"
       />
       {open && (
         <div className="absolute right-0 top-full z-20 mt-1 w-64 overflow-hidden rounded-md border border-neutral-700 bg-neutral-900 shadow-xl">

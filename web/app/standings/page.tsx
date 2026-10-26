@@ -16,7 +16,7 @@ export default async function StandingsPage({
   const tab = (active: boolean) =>
     `px-3 py-1 text-xs transition-colors ${active ? "bg-orange-600 text-white" : "text-neutral-400 hover:text-white"}`;
   const viewToggle = (view: "table" | "odds") => (
-    <span className="flex overflow-hidden rounded-md border border-neutral-700">
+    <span className="flex shrink-0 overflow-hidden rounded-md border border-neutral-700">
       <Link href="/standings" className={tab(view === "table")}>Table</Link>
       <Link href="/standings?view=odds" className={tab(view === "odds")}>Odds</Link>
     </span>
@@ -125,7 +125,8 @@ export default async function StandingsPage({
                         className="h-5 w-5 object-contain"
                       />
                     )}
-                    {row.club.name}
+                    <span className="sm:hidden">{row.club.abbreviatedName ?? row.club.name}</span>
+                    <span className="hidden sm:inline">{row.club.name}</span>
                   </Link>
                 </td>
                 <td className="px-3 py-2 text-right font-medium">

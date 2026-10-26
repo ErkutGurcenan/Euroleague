@@ -54,7 +54,8 @@ export default async function PlayerPage({
 
   return (
     <div>
-      <div className="mb-6 flex items-center gap-4">
+      {/* On phones the name block's basis pushes the view toggle onto its own line. */}
+      <div className="mb-6 flex flex-wrap items-center gap-4">
         {player.imageUrl && (
           <Image
             src={player.imageUrl}
@@ -65,8 +66,8 @@ export default async function PlayerPage({
             className="h-20 w-20 rounded-full border border-neutral-800 object-cover"
           />
         )}
-        <div className="min-w-0 flex-1">
-          <h1 className="text-2xl font-bold">
+        <div className="min-w-0 flex-1 basis-40">
+          <h1 className="text-xl font-bold wrap-break-word sm:text-2xl">
             {player.dorsal && (
               <span className="mr-2 text-neutral-500">#{player.dorsal}</span>
             )}

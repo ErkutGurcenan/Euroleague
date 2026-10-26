@@ -234,7 +234,7 @@ export default async function GamesPage({
                 ? PHASES[phase]
                 : `Regular season · Round ${round}`}
           </span>
-          <span className="flex overflow-hidden rounded-md border border-neutral-700 text-xs">
+          <span className="flex shrink-0 overflow-hidden rounded-md border border-neutral-700 text-xs">
             <Link
               href="/games"
               className={`px-2 py-1 ${

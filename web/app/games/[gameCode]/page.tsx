@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import Headshot from "@/components/Headshot";
 import HeadToHead from "@/components/HeadToHead";
-import { appliesToRound, isUnavailable, StatusPill, timeline } from "@/components/InjuryStatus";
+import { appliesToRound, isUnavailable, noteAndTimeline, StatusPill } from "@/components/InjuryStatus";
 import { PredictionCard } from "@/components/Predictions";
 import RotationChart from "@/components/RotationChart";
 import ShotChart from "@/components/ShotChart";
@@ -420,7 +420,7 @@ export default async function GamePage({
                             )}
                           </div>
                           <div className="truncate text-xs text-neutral-400">
-                            {e.note} · {timeline(e.rounds)}
+                            {noteAndTimeline(e)}
                           </div>
                         </div>
                         <StatusPill status={e.status} />

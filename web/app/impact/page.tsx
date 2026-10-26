@@ -18,9 +18,9 @@ export default async function ImpactPage({
   return (
     <div>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 sm:flex-nowrap">
           <h1 className="text-2xl font-bold">Player impact</h1>
-          <span className="flex overflow-hidden rounded-md border border-neutral-700">
+          <span className="flex shrink-0 overflow-hidden rounded-md border border-neutral-700">
             <Link href="/impact" className={tab(view === "adjusted")}>
               Adjusted
             </Link>

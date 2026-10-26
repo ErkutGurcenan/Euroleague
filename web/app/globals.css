@@ -4,3 +4,13 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
+
+/* Preflight lets images shrink (max-width: 100%), so when a table is squeezed to
+   fit a phone the browser counts crests and headshots as zero wide and the text
+   beside them runs into the next column. Images in tables all have fixed sizes. */
+@layer base {
+  td img,
+  th img {
+    max-width: none;
+  }
+}

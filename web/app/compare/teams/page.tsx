@@ -95,9 +95,9 @@ export default async function CompareTeamsPage({
 
   return (
     <div>
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-bold">Compare teams</h1>
-        <span className="flex overflow-hidden rounded-md border border-neutral-700 text-xs">
+        <span className="flex shrink-0 overflow-hidden rounded-md border border-neutral-700 text-xs">
           <Link
             href="/compare"
             className="px-2 py-1 text-neutral-400 hover:text-white"

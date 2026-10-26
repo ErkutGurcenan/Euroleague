@@ -128,7 +128,10 @@ function MarketLine({ p }: { p: Prediction }) {
         <div key={t.strategy} className="text-xs text-neutral-400">
           Paper trade, {STRATEGY_LABEL[t.strategy] ?? t.strategy}: bought {t.shares} {(t.side === "home" ? p.home : p.away).clubCode} shares at {cents(t.price ?? 0)}
           {t.pnl !== null ? (
-            <span className={t.pnl >= 0 ? "text-emerald-400" : "text-red-400"}> {money(t.pnl)}</span>
+            <>
+              {" "}
+              <span className={`whitespace-nowrap ${t.pnl >= 0 ? "text-emerald-400" : "text-red-400"}`}>{money(t.pnl)}</span>
+            </>
           ) : (
             <span className="text-neutral-500"> (open)</span>
           )}

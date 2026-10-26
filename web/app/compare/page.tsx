@@ -95,9 +95,9 @@ export default async function ComparePage({
 
   return (
     <div>
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-bold">Compare players</h1>
-        <span className="flex overflow-hidden rounded-md border border-neutral-700 text-xs">
+        <span className="flex shrink-0 overflow-hidden rounded-md border border-neutral-700 text-xs">
           <span className="bg-neutral-800 px-2 py-1 text-white">Players</span>
           <Link
             href="/compare/teams"
