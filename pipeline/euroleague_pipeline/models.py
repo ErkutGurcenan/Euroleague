@@ -453,7 +453,7 @@ class PaperTrade(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     season_code: Mapped[str] = mapped_column(String(8), index=True)
     game_code: Mapped[int] = mapped_column(Integer)
-    strategy: Mapped[str] = mapped_column(String(20))  # "eurostepper" or "jev"
+    strategy: Mapped[str] = mapped_column(String(20))  # eurostepper, jev, eurostepper_pick or jev_pick
     entered_at: Mapped[datetime] = mapped_column(DateTime)
     snapshot_at: Mapped[datetime] = mapped_column(DateTime)  # price used, always before tip-off
     model_home_prob: Mapped[Optional[float]] = mapped_column(Float)

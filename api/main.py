@@ -1009,7 +1009,10 @@ def ai_dict(a: AiPrediction, game: Optional[Game] = None) -> dict:
 
 
 MARKET_SOURCE = "Polymarket"
-STRATEGIES = {"eurostepper": "Eurostepper", "jev": "Jev AI"}
+# paper-trading accounts (pipeline market.py): the value rule buys the side a
+# model rates above the market price; the _pick rule backs the model's favourite
+STRATEGIES = {"eurostepper": "Eurostepper", "jev": "Jev AI",
+              "eurostepper_pick": "Eurostepper", "jev_pick": "Jev AI"}
 
 
 def market_dict(s: MarketSnapshot) -> dict:
@@ -1246,7 +1249,7 @@ def market_overview(graded: list[dict], ai_calls: dict, prices: dict[int, Market
         fees = sum(t.fee or 0 for t in settled)
         pnl = sum(t.pnl or 0 for t in settled)
         summaries.append({
-            "key": key, "label": label,
+            "key": key, "label": label, "rule": "pick" if key.endswith("_pick") else "value",
             "trades": len(settled) + len(opened), "settled": len(settled),
             "won": sum(t.status == "won" for t in settled), "lost": sum(t.status == "lost" for t in settled),
             "open": len(opened), "openStake": round(sum((t.cost or 0) + (t.fee or 0) for t in opened), 2),
@@ -1279,7 +1282,8 @@ def market_overview(graded: list[dict], ai_calls: dict, prices: dict[int, Market
         if not done:
             continue
         for k, t in done.items():
-            running[k] += t["pnl"] or 0
+            if k in running:
+                running[k] += t["pnl"] or 0
         series.append({"gameCode": row["gameCode"], "label": f"{row['home']['clubCode']} v {row['away']['clubCode']}",
                        **{k: round(v, 2) for k, v in running.items()}})
 

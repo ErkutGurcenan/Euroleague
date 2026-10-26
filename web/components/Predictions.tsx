@@ -23,7 +23,12 @@ function utcTime(iso: string): string {
   return new Date(iso).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "UTC" });
 }
 
-const STRATEGY_LABEL: Record<string, string> = { eurostepper: "Eurostepper", jev: "Jev AI" };
+const STRATEGY_LABEL: Record<string, string> = {
+  eurostepper: "Eurostepper",
+  jev: "Jev AI",
+  eurostepper_pick: "Eurostepper, backing its pick",
+  jev_pick: "Jev AI, backing its pick",
+};
 
 function Crest({ team, size = 20 }: { team: ClubBadge; size?: number }) {
   return team.clubCrest ? (
@@ -546,22 +551,24 @@ function StrategyCard({ s }: { s: StrategySummary }) {
   );
 }
 
-const LINE: Record<string, string> = { eurostepper: "#fb923c", jev: "#38bdf8" };
+const LINE: Record<string, string> = { eurostepper: "#fb923c", jev: "#38bdf8", eurostepper_pick: "#fb923c", jev_pick: "#38bdf8" };
 
 function PnlChart({ series }: { series: PredictionsOverview["market"]["paper"]["series"] }) {
-  const keys = ["eurostepper", "jev"] as const;
-  const top = Math.max(10, ...series.flatMap((r) => keys.map((k) => Math.abs(r[k]))));
+  const keys = ["eurostepper", "jev", "eurostepper_pick", "jev_pick"] as const;
+  const val = (r: (typeof series)[number], k: (typeof keys)[number]) => r[k] ?? 0;
+  const top = Math.max(10, ...series.flatMap((r) => keys.map((k) => Math.abs(val(r, k)))));
   const x = (i: number) => 52 + (i / Math.max(series.length - 1, 1)) * 536;
   const y = (v: number) => 95 - (v / top) * 80;
   return (
     <div className="grid gap-1 rounded-lg border border-neutral-800 bg-neutral-900/40 p-3">
-      <div className="flex gap-4 text-xs text-neutral-400">
-        {keys.map((k) => (
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-neutral-400">
+        {(["eurostepper", "jev"] as const).map((k) => (
           <span key={k} className="flex items-center gap-1.5">
             <span className="inline-block h-0.5 w-4" style={{ background: LINE[k] }} />
             {STRATEGY_LABEL[k]}
           </span>
         ))}
+        <span>solid: value rule · dashed: backing the pick</span>
       </div>
       <svg viewBox="0 0 600 190" className="w-full" role="img" aria-label="Paper trading profit after each settled game">
         <g fontSize="11" fill="#737373" fontFamily="inherit" textAnchor="end">
@@ -573,14 +580,15 @@ function PnlChart({ series }: { series: PredictionsOverview["market"]["paper"]["
         {keys.map((k) => (
           <polyline
             key={k}
-            points={series.map((r, i) => `${x(i).toFixed(1)},${y(r[k]).toFixed(1)}`).join(" ")}
+            points={series.map((r, i) => `${x(i).toFixed(1)},${y(val(r, k)).toFixed(1)}`).join(" ")}
             fill="none" stroke={LINE[k]} strokeWidth="2" strokeLinejoin="round"
+            strokeDasharray={k.endsWith("_pick") ? "5 4" : undefined}
           />
         ))}
         {keys.map((k) =>
           series.map((r, i) => (
-            <circle key={`${k}${r.gameCode}`} cx={x(i)} cy={y(r[k])} r="2.5" fill={LINE[k]}>
-              <title>{`${STRATEGY_LABEL[k]} after ${r.label}: ${money(r[k])}`}</title>
+            <circle key={`${k}${r.gameCode}`} cx={x(i)} cy={y(val(r, k))} r="2.5" fill={LINE[k]}>
+              <title>{`${STRATEGY_LABEL[k]} after ${r.label}: ${money(val(r, k))}`}</title>
             </circle>
           )),
         )}
@@ -590,9 +598,10 @@ function PnlChart({ series }: { series: PredictionsOverview["market"]["paper"]["
   );
 }
 
-function TradeCell({ t, g }: { t?: PaperTrade; g: PaperGame }) {
+function TradeCell({ t, g, showModel = true }: { t?: PaperTrade; g: PaperGame; showModel?: boolean }) {
   if (!t) return <span className="text-neutral-600">–</span>;
-  const model = t.modelHomeProb !== null ? <span className="text-neutral-500">{pct(t.modelHomeProb)} </span> : null;
+  const model = showModel && t.modelHomeProb !== null
+    ? <span className="text-neutral-500">{pct(t.modelHomeProb)} </span> : null;
   if (t.status === "skipped" || !t.side || t.price === null) {
     return <span className="text-neutral-500">{model}skipped: {t.note}</span>;
   }
@@ -617,11 +626,12 @@ function NextTrades({ items }: { items: Prediction[] }) {
   const signal = (prob: number | undefined, p: Prediction) => {
     if (prob === undefined) return <span className="text-neutral-600">–</span>;
     const price = p.market!.homePrice;
-    if (prob === price) return <span className="text-neutral-500">{pct(prob)} no trade</span>;
+    const pick = prob === 0.5 ? "none" : (prob > 0.5 ? p.home : p.away).clubCode;
     return (
       <span>
         <span className="text-neutral-500">{pct(prob)} </span>
-        <span className="text-neutral-300">→ {(prob > price ? p.home : p.away).clubCode}</span>
+        <span className="text-neutral-300">{prob === price ? "no value trade" : `→ ${(prob > price ? p.home : p.away).clubCode}`}</span>
+        <span className="text-neutral-500">{` · pick ${pick}`}</span>
       </span>
     );
   };
@@ -674,14 +684,22 @@ export function PaperTradingPanel({ data }: { data: PredictionsOverview }) {
   return (
     <div className="grid gap-4">
       <p className="text-sm text-neutral-400">
-        Each model trades a paper account on Polymarket&apos;s prices. At tip-off, if the model gives the home
-        team a higher chance than the market&apos;s price it buys {paper.shares} home shares; if lower, {paper.shares} away
-        shares. A share pays $1 if its team wins, so buying at 77¢ makes 23¢ a share when right and loses
-        77¢ when wrong.
+        {"Each model trades two paper accounts on Polymarket's prices, at tip-off. The value rule buys "
+          + `${paper.shares} shares of the side the model rates above the market price (home if the model gives the `
+          + "home team a higher chance than the market, away if lower). The pick rule simply backs the team the "
+          + "model thinks will win. A share pays $1 if its team wins, so buying at 77¢ makes 23¢ a share when "
+          + "right and loses 77¢ when wrong."}
       </p>
-      <div className="grid gap-3 sm:grid-cols-2">
-        {paper.strategies.map((s) => <StrategyCard key={s.key} s={s} />)}
-      </div>
+      {(["value", "pick"] as const).map((rule) => (
+        <div key={rule} className="grid gap-2">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-neutral-400">
+            {rule === "value" ? "Value rule: buy what the market underprices" : "Pick rule: back the model's favourite"}
+          </h3>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {paper.strategies.filter((s) => s.rule === rule).map((s) => <StrategyCard key={s.key} s={s} />)}
+          </div>
+        </div>
+      ))}
       {paper.series.length >= 2 && <PnlChart series={paper.series} />}
       {paper.games.length > 0 && (
         <div className="overflow-x-auto rounded-lg border border-neutral-800">
@@ -690,8 +708,10 @@ export function PaperTradingPanel({ data }: { data: PredictionsOverview }) {
               <tr>
                 <th className="px-3 py-2">Game</th>
                 <th className="px-3 py-2 text-right">Polymarket, home</th>
-                <th className="px-3 py-2">Eurostepper</th>
-                <th className="px-3 py-2">Jev AI</th>
+                <th className="px-3 py-2">Eurostepper, value</th>
+                <th className="px-3 py-2">Eurostepper, pick</th>
+                <th className="px-3 py-2">Jev AI, value</th>
+                <th className="px-3 py-2">Jev AI, pick</th>
                 <th className="px-3 py-2">Result</th>
               </tr>
             </thead>
@@ -705,7 +725,9 @@ export function PaperTradingPanel({ data }: { data: PredictionsOverview }) {
                     {pct(g.marketHomePrice)}
                   </td>
                   <td className="px-3 py-2 tabular-nums"><TradeCell t={g.trades.eurostepper} g={g} /></td>
+                  <td className="px-3 py-2 tabular-nums"><TradeCell t={g.trades.eurostepper_pick} g={g} showModel={false} /></td>
                   <td className="px-3 py-2 tabular-nums"><TradeCell t={g.trades.jev} g={g} /></td>
+                  <td className="px-3 py-2 tabular-nums"><TradeCell t={g.trades.jev_pick} g={g} showModel={false} /></td>
                   <td className="px-3 py-2 tabular-nums text-neutral-400">
                     {g.result ? `${g.result.homeScore}–${g.result.awayScore}` : "in play"}
                   </td>

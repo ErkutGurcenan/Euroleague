@@ -818,6 +818,7 @@ export type PaperTrade = {
 export type StrategySummary = {
   key: string;
   label: string;
+  rule: "value" | "pick";
   trades: number;
   settled: number;
   won: number;
@@ -879,7 +880,14 @@ export type PredictionsOverview = {
       shares: number;
       strategies: StrategySummary[];
       games: PaperGame[];
-      series: { gameCode: number; label: string; eurostepper: number; jev: number }[];
+      series: {
+        gameCode: number;
+        label: string;
+        eurostepper: number;
+        jev: number;
+        eurostepper_pick?: number;
+        jev_pick?: number;
+      }[];
     };
   };
   backtest: {
