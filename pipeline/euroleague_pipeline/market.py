@@ -13,11 +13,15 @@ Run every 15 minutes by cron. Each run:
    until tip-off.
 2. Trades. Once a game has tipped off, enters one paper trade per strategy
    using the last price saved before tip-off and that model's frozen
-   pre-game probability. Model above the market price: buy 100 home shares.
-   Below: buy 100 away shares. The fill is the order book's price for 100
-   shares, plus Polymarket's taker fee. A market whose spread is wider than
-   10 cents, or that cannot fill 100 shares within 5 cents of its best ask,
-   is skipped: it has no real price to trade at.
+   pre-game probability. Two rules, each run for Eurostepper and for Jev:
+   - value ("eurostepper", "jev"): model above the market price, buy 100
+     home shares; below, buy 100 away shares;
+   - pick ("eurostepper_pick", "jev_pick"): buy 100 shares of the team the
+     model rates more likely to win.
+   The fill is the order book's price for 100 shares, plus Polymarket's
+   taker fee. A market whose spread is wider than 10 cents, or that cannot
+   fill 100 shares within 5 cents of its best ask, is skipped: it has no
+   real price to trade at.
 3. Settlement. When the result is in, each winning share pays $1.
 
 Nothing is bought: these are simulated trades that test whether the models
@@ -52,7 +56,7 @@ MAX_SPREAD = 0.10
 MAX_SLIPPAGE = 0.05  # 100 shares must fill within 5 cents of the best ask
 RESAVE = timedelta(minutes=60)
 CLOSING = timedelta(minutes=30)
-STRATEGIES = ("eurostepper", "jev")
+STRATEGIES = ("eurostepper", "jev", "eurostepper_pick", "jev_pick")
 AI_PROVIDER = "jev"
 
 
@@ -313,9 +317,10 @@ def enter(session: Session, season: str, now: datetime) -> int:
                 AiPrediction.season_code == season, AiPrediction.game_code == g.game_code,
                 AiPrediction.provider == AI_PROVIDER, AiPrediction.made_at < g.utc_date)
         ).scalar()
-        for strategy, p in (("eurostepper", ours), ("jev", jev)):
+        for strategy in STRATEGIES:
             if (g.game_code, strategy) in have:
                 continue
+            p = ours if strategy.startswith("eurostepper") else jev
             session.add(make_trade(season, g.game_code, strategy, p, snap, now))
             entered += 1
     session.commit()
@@ -324,6 +329,9 @@ def enter(session: Session, season: str, now: datetime) -> int:
 
 def make_trade(season: str, game_code: int, strategy: str, p: float | None,
                snap: MarketSnapshot, now: datetime) -> PaperTrade:
+    """A value trade (back the side the model rates above the market) or, for
+    the _pick strategies, a trade on the team the model rates more likely to win."""
+    pick = strategy.endswith("_pick")
     t = PaperTrade(season_code=season, game_code=game_code, strategy=strategy, entered_at=now,
                    snapshot_at=snap.captured_at, model_home_prob=p,
                    market_home_price=snap.home_price, shares=SHARES, status="skipped")
@@ -332,10 +340,12 @@ def make_trade(season: str, game_code: int, strategy: str, p: float | None,
         t.note = "no pre-game prediction"
     elif spread is None or spread > MAX_SPREAD + 1e-9:
         t.note = "market too thin" + (f" (spread {spread * 100:.0f}¢)" if spread is not None else "")
-    elif p == snap.home_price:
+    elif pick and p == 0.5:
+        t.note = "model has no favourite"
+    elif not pick and p == snap.home_price:
         t.note = "model agrees with the market"
     else:
-        t.side = "home" if p > snap.home_price else "away"
+        t.side = "home" if p > (0.5 if pick else snap.home_price) else "away"
         best = snap.home_ask if t.side == "home" else 1 - snap.home_bid
         t.entry_price = snap.home_fill if t.side == "home" else snap.away_fill
         if t.entry_price is None or t.entry_price > best + MAX_SLIPPAGE + 1e-9:
