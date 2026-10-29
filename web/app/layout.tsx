@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import Link from "next/link";
+import Link from "@/components/Link";
 import Logo from "@/components/Logo";
 import DesktopNav from "@/components/DesktopNav";
 import MobileNav from "@/components/MobileNav";

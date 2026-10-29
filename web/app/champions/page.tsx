@@ -1,6 +1,6 @@
 export const metadata = { title: "Champions" };
 
-import Link from "next/link";
+import Link from "@/components/Link";
 import { getChampions } from "@/lib/api";
 
 export default async function ChampionsPage() {

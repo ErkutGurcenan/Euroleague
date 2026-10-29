@@ -1,6 +1,6 @@
 export const metadata = { title: "Roll of honor" };
 
-import Link from "next/link";
+import Link from "@/components/Link";
 import Headshot from "@/components/Headshot";
 import { getHonorRoll, type HonorAward } from "@/lib/api";
 

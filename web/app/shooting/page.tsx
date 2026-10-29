@@ -1,6 +1,6 @@
 export const metadata = { title: "Shooting leaders" };
 
-import Link from "next/link";
+import Link from "@/components/Link";
 import Headshot from "@/components/Headshot";
 import PlayersToggle from "@/components/PlayersToggle";
 import { getShootingLeaders } from "@/lib/api";

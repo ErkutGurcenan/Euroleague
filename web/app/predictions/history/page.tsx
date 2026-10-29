@@ -1,6 +1,6 @@
 export const metadata = { title: "Prediction history" };
 
-import Link from "next/link";
+import Link from "@/components/Link";
 import PredictionsToggle from "@/components/PredictionsToggle";
 import { getPredictionHistory, type GradedCall, type HistoryGame, type Tally } from "@/lib/api";
 import { currentSeason } from "@/lib/season";

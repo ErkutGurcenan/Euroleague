@@ -1,6 +1,6 @@
 export const metadata = { title: "Standings" };
 
-import Link from "next/link";
+import Link from "@/components/Link";
 import PositionChart from "@/components/PositionChart";
 import { OddsTable } from "@/components/Ratings";
 import { getOdds, getStandings, getStandingsHistory } from "@/lib/api";

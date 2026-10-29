@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import type { PowerRanking, TeamOdds } from "@/lib/api";
 
 function TeamCell({ t }: { t: { clubCode: string; clubName: string; clubCrest: string | null } }) {

@@ -1,6 +1,6 @@
 export const metadata = { title: "Compare teams" };
 
-import Link from "next/link";
+import Link from "@/components/Link";
 import HeadToHead from "@/components/HeadToHead";
 import ShotChart from "@/components/ShotChart";
 import TeamPicker from "@/components/TeamPicker";

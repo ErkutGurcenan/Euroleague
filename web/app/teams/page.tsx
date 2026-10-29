@@ -1,6 +1,6 @@
 export const metadata = { title: "Teams" };
 
-import Link from "next/link";
+import Link from "@/components/Link";
 import { getClubs } from "@/lib/api";
 import { currentSeason } from "@/lib/season";
 

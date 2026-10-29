@@ -1,6 +1,6 @@
 export const metadata = { title: "Player impact" };
 
-import Link from "next/link";
+import Link from "@/components/Link";
 import { AdjustedLeaderboard } from "@/components/AdjustedImpact";
 import { OnOffRanking } from "@/components/OnOff";
 import { getAdjustedImpact, getLeagueOnOff } from "@/lib/api";

@@ -1,6 +1,6 @@
 export const metadata = { title: "All-time leaders" };
 
-import Link from "next/link";
+import Link from "@/components/Link";
 import Headshot from "@/components/Headshot";
 import { getAllTimeLeaders, type AllTimeCategory } from "@/lib/api";
 

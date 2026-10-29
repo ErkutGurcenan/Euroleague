@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 
 export default function PredictionsToggle({ active }: { active: "overview" | "history" }) {
   const base = "px-3 py-1 text-xs transition-colors";
