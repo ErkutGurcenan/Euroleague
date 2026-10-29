@@ -17,7 +17,7 @@ from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import create_engine, func, or_, select
+from sqlalchemy import and_, create_engine, func, or_, select
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "pipeline"))
@@ -1086,12 +1086,12 @@ def game_prediction(game_code: int, season: str = DEFAULT_SEASON) -> dict:
         return out
 
 
-def next_round(schedule: list[Game], now: datetime) -> tuple[set[int], Optional[str]]:
+def next_round(schedule: list[Game], now: datetime) -> tuple[set[int], Optional[str], Optional[int]]:
     """Games still to tip off in the round being played now, or else in the
     next round, plus any postponed game fitted in before that round ends."""
     ahead = [g for g in schedule if not g.played and g.utc_date and g.utc_date > now and g.round is not None]
     if not ahead:
-        return set(), None
+        return set(), None, None
     started = [g.round for g in schedule if g.round is not None and g.utc_date and g.utc_date <= now]
     current = max(started) if started else None
     rounds = {g.round for g in ahead}
@@ -1103,7 +1103,7 @@ def next_round(schedule: list[Game], now: datetime) -> tuple[set[int], Optional[
     chosen = [g for g in ahead if g.round == target]
     last = max(g.utc_date for g in chosen)
     chosen += [g for g in ahead if g.round < target and g.utc_date <= last]
-    return {g.game_code for g in chosen}, chosen[0].round_name
+    return {g.game_code for g in chosen}, chosen[0].round_name, target
 
 
 @app.get("/api/predictions")
@@ -1129,7 +1129,7 @@ def predictions_overview(season: str = DEFAULT_SEASON) -> dict:
             for a in session.execute(select(AiPrediction).where(AiPrediction.season_code == season)).scalars()
         }
         prices = pre_game_prices(session, season)
-        shown, round_name = next_round(
+        shown, round_name, round_number = next_round(
             session.execute(select(Game).where(Game.season_code == season)).scalars().all(), now)
         trades = session.execute(select(PaperTrade).where(PaperTrade.season_code == season)).scalars().all()
         traded_games = {
@@ -1211,6 +1211,7 @@ def predictions_overview(season: str = DEFAULT_SEASON) -> dict:
         "season": season,
         "upcoming": upcoming,
         "upcomingRound": round_name,
+        "upcomingRoundNumber": round_number,
         "record": record,
         "eloRecord": elo_record,
         "recent": graded[:40],
@@ -1412,6 +1413,154 @@ def live_scores(season: str = DEFAULT_SEASON) -> dict:
     games.sort(key=lambda d: (d["status"] != "live", d["utcDate"] or ""))
     return {"games": games, "active": upcoming > 0 or any(d["status"] == "live" for d in games),
             "updatedAt": now.isoformat() + "Z"}
+
+
+def applies_to_round(rounds: str, round_no: Optional[int]) -> bool:
+    """The web's appliesToRound: an absence whose stated last round is before
+    this one is assumed over."""
+    if round_no is None:
+        return True
+    m = re.match(r"^(?:\d+-)?(\d+)$", rounds or "")
+    return not m or round_no <= int(m.group(1))
+
+
+def is_unavailable(e: dict) -> bool:
+    """The web's isUnavailable: injured or ill, or ruled out for any reason."""
+    return (e.get("reason") in ("injury", "illness") and e.get("status") != "Ready") or e.get("status") == "Out"
+
+
+@app.get("/api/rounds/{round_no}/preview")
+def round_preview(round_no: int, season: str = DEFAULT_SEASON) -> dict:
+    """One regular-season round on one page: for each game both teams'
+    position, record, form and power rating going in, our call with Jev's and
+    the market's (the match page's prediction object), who's out, and the
+    earlier meetings; once a game is played, its result."""
+    with Session(engine) as session:
+        clubs = load_clubs(session)
+        games = session.execute(
+            select(Game).where(Game.season_code == season, Game.phase_type == "RS", Game.round == round_no)
+            .order_by(Game.utc_date, Game.game_code)
+        ).scalars().all()
+        if not games:
+            raise HTTPException(404, f"no regular-season round {round_no} in {season}")
+        codes = [g.game_code for g in games]
+        total_rounds = session.execute(
+            select(func.max(Game.round)).where(Game.season_code == season, Game.phase_type == "RS")
+        ).scalar()
+        preds = {p.game_code: p for p in session.execute(
+            select(GamePrediction).where(GamePrediction.season_code == season, GamePrediction.backtest.is_(False),
+                                         GamePrediction.game_code.in_(codes))).scalars()}
+        calls = {a.game_code: a for a in session.execute(
+            select(AiPrediction).where(AiPrediction.season_code == season, AiPrediction.provider == "jev",
+                                       AiPrediction.game_code.in_(codes))).scalars()}
+        prices = pre_game_prices(session, season, codes)
+        trades: dict[int, list[PaperTrade]] = {}
+        for t in session.execute(
+            select(PaperTrade).where(PaperTrade.season_code == season, PaperTrade.game_code.in_(codes))
+        ).scalars():
+            trades.setdefault(t.game_code, []).append(t)
+
+        # the table and form going into the round
+        table_round = session.execute(
+            select(func.max(StandingRow.round)).where(StandingRow.season_code == season, StandingRow.round < round_no)
+        ).scalar()
+        table = {r.club_code: r for r in session.execute(
+            select(StandingRow).where(StandingRow.season_code == season, StandingRow.round == table_round)
+        ).scalars()} if table_round else {}
+        splits = club_splits(session, season, up_to_round=round_no - 1)
+
+        # power rating before each game if it's been played, else the current one
+        before = {(r.game_code, r.club_code): r.rating_before for r in session.execute(
+            select(TeamRating).where(TeamRating.season_code == season, TeamRating.game_code.in_(codes))).scalars()}
+        latest: dict[str, float] = {}
+        for code, rating in session.execute(
+            select(TeamRating.club_code, TeamRating.rating_after).where(TeamRating.season_code == season)
+            .order_by(TeamRating.utc_date, TeamRating.game_code)
+        ):
+            latest[code] = rating
+        rank = {code: i for i, (code, _) in enumerate(sorted(latest.items(), key=lambda kv: -kv[1]), 1)}
+
+        # earlier meetings of each pairing, any season
+        meetings: dict[int, list[Game]] = {}
+        for g in games:
+            a, b = g.local_club_code, g.road_club_code
+            meetings[g.game_code] = session.execute(
+                select(Game).where(
+                    Game.played, Game.local_score.is_not(None), Game.utc_date < g.utc_date,
+                    or_(and_(Game.local_club_code == a, Game.road_club_code == b),
+                        and_(Game.local_club_code == b, Game.road_club_code == a)))
+                .order_by(Game.utc_date)
+            ).scalars().all()
+
+    # who's out: the current injury report only says something about games to come
+    report = None
+    if any(not g.played for g in games):
+        try:
+            report = injuries()
+        except (OSError, ValueError, KeyError):
+            report = None
+    out: dict[str, list[dict]] = {}
+    if report and report.get("season") == season:
+        for e in report["entries"]:
+            if is_unavailable(e) and applies_to_round(e.get("rounds", ""), round_no):
+                out.setdefault(e["club"], []).append({
+                    "player": e["player"], "status": e["status"], "note": e["note"],
+                    "personCode": e.get("personCode"), "imageUrl": e.get("imageUrl")})
+
+    def team(code: str, g: Game) -> dict:
+        row, form = table.get(code), splits.get(code, {}).get("form", [])
+        return {
+            **club_badge(clubs, code),
+            "position": row.position if row else None,
+            "wins": row.games_won if row else 0, "losses": row.games_lost if row else 0,
+            "form": form,
+            "rating": round(before.get((g.game_code, code), latest.get(code, 1500))),
+            "rank": rank.get(code),
+            "out": out.get(code, []) if not g.played else [],
+        }
+
+    def head_to_head_of(g: Game) -> dict:
+        past = meetings[g.game_code]
+        home_wins = sum((m.local_score > m.road_score) == (m.local_club_code == g.local_club_code) for m in past)
+        last = past[-1] if past else None
+        return {
+            "meetings": len(past), "homeWins": home_wins, "awayWins": len(past) - home_wins,
+            "last": {
+                "gameCode": last.game_code, "season": last.season_code, "seasonLabel": season_label(last.season_code),
+                "home": last.local_club_code, "away": last.road_club_code,
+                "homeScore": last.local_score, "awayScore": last.road_score,
+            } if last else None,
+        }
+
+    rows = []
+    for g in games:
+        p = preds.get(g.game_code)
+        prediction = None
+        if p is not None:
+            prediction = {"available": True, **prediction_dict(p, clubs, g)}
+            a, price = calls.get(g.game_code), prices.get(g.game_code)
+            prediction["ai"] = ai_dict(a, g) if a else None
+            prediction["market"] = market_dict(price) if price else None
+            prediction["paperTrades"] = [trade_dict(t) for t in sorted(
+                trades.get(g.game_code, []), key=lambda t: list(STRATEGIES).index(t.strategy))]
+        rows.append({
+            "gameCode": g.game_code,
+            "utcDate": g.utc_date.isoformat() + "Z" if g.utc_date else None,
+            "played": bool(g.played and g.local_score is not None),
+            "result": {"homeScore": g.local_score, "awayScore": g.road_score}
+                      if g.played and g.local_score is not None else None,
+            "home": team(g.local_club_code, g), "away": team(g.road_club_code, g),
+            "prediction": prediction,
+            "headToHead": head_to_head_of(g),
+        })
+    return {
+        "season": season, "seasonLabel": season_label(season),
+        "round": round_no, "roundName": games[0].round_name, "totalRounds": total_rounds,
+        "tableAfterRound": table_round,
+        "injuriesUpdated": report.get("sourceUpdated") if report else None,
+        "injuriesSource": report.get("source") if report else None,
+        "games": rows,
+    }
 
 
 @app.get("/api/games/{game_code}/rotation")

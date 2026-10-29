@@ -1,5 +1,6 @@
 export const metadata = { title: "Predictions" };
 
+import Link from "@/components/Link";
 import { BacktestPanel, ChallengerPanel, MarketPanel, PaperTradingPanel, TrackRecord, UpcomingList } from "@/components/Predictions";
 import PredictionsToggle from "@/components/PredictionsToggle";
 import { getPredictions } from "@/lib/api";
@@ -19,7 +20,14 @@ export default async function PredictionsPage() {
         </span>
       </div>
       <section className="grid gap-3">
-        <h2 className="text-lg font-semibold">{data.upcomingRound ? `Coming up: ${data.upcomingRound}` : "Coming up"}</h2>
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-lg font-semibold">{data.upcomingRound ? `Coming up: ${data.upcomingRound}` : "Coming up"}</h2>
+          {data.upcomingRoundNumber && (
+            <Link href={`/rounds/${data.upcomingRoundNumber}`} className="text-sm text-orange-400 hover:underline">
+              Full round preview →
+            </Link>
+          )}
+        </div>
         <UpcomingList items={data.upcoming} />
       </section>
       <section className="grid gap-3">

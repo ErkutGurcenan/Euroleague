@@ -859,6 +859,7 @@ export type PredictionsOverview = {
   season: string;
   upcoming: Prediction[];
   upcomingRound: string | null;
+  upcomingRoundNumber: number | null;
   record: Score;
   eloRecord: Score;
   recent: Prediction[];
@@ -1124,5 +1125,47 @@ export type LiveScores = { games: LiveGame[]; active: boolean; updatedAt: string
 
 export function getLive() {
   return get<LiveScores>("/api/live");
+}
+
+export type PreviewTeam = ClubBadge & {
+  position: number | null;
+  wins: number;
+  losses: number;
+  form: string[];
+  rating: number;
+  rank: number | null;
+  out: { player: string; status: string; note: string; personCode: string | null; imageUrl: string | null }[];
+};
+
+export type PreviewGame = {
+  gameCode: number;
+  utcDate: string | null;
+  played: boolean;
+  result: { homeScore: number; awayScore: number } | null;
+  home: PreviewTeam;
+  away: PreviewTeam;
+  prediction: ({ available: true } & Prediction) | null;
+  headToHead: {
+    meetings: number;
+    homeWins: number;
+    awayWins: number;
+    last: { gameCode: number; season: string; seasonLabel: string; home: string; away: string; homeScore: number; awayScore: number } | null;
+  };
+};
+
+export type RoundPreview = {
+  season: string;
+  seasonLabel: string;
+  round: number;
+  roundName: string | null;
+  totalRounds: number | null;
+  tableAfterRound: number | null;
+  injuriesUpdated: string | null;
+  injuriesSource: string | null;
+  games: PreviewGame[];
+};
+
+export function getRoundPreview(round: number, season?: string) {
+  return get<RoundPreview>(`/api/rounds/${round}/preview${qs({ season })}`);
 }
 

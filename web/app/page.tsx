@@ -154,9 +154,11 @@ export default async function HomePage() {
       {inProgress && (
         <Link
           href={
-            lastPlayed?.phaseType === "RS" && lastPlayed.round
-              ? `/games?round=${lastPlayed.round}`
-              : "/games"
+            nextGame?.phaseType === "RS" && nextGame.round
+              ? `/rounds/${nextGame.round}`
+              : lastPlayed?.phaseType === "RS" && lastPlayed.round
+                ? `/games?round=${lastPlayed.round}`
+                : "/games"
           }
           className="mb-6 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 rounded-xl border border-orange-600/40 bg-neutral-900/60 p-4 transition-colors hover:border-orange-500"
         >
