@@ -28,6 +28,8 @@ export type StandingRow = {
 export type GameSide = {
   code: string | null;
   name: string | null;
+  /** short club name for phones, e.g. "Crvena Zvezda" */
+  shortName?: string | null;
   crestUrl: string | null;
   score: number | null;
 };

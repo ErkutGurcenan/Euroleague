@@ -13,7 +13,10 @@ function Side({ side, won, gameId, which }: { side: GameSide; won: boolean; game
           // eslint-disable-next-line @next/next/no-img-element
           <img src={side.crestUrl} alt="" className="h-4 w-4 object-contain" />
         )}
-        <span className="truncate text-sm">{side.name}</span>
+        <span className="truncate text-sm">
+          <span className="sm:hidden">{side.shortName ?? side.name}</span>
+          <span className="hidden sm:inline">{side.name}</span>
+        </span>
       </Link>
       <span
         className={`text-sm tabular-nums ${

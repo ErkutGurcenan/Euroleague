@@ -239,7 +239,8 @@ export default async function GamePage({
                 href={`/teams/${side.club?.code}`}
                 className="font-semibold hover:text-orange-400"
               >
-                {side.club?.name}
+                <span className="sm:hidden">{side.club?.abbreviatedName ?? side.club?.name}</span>
+                <span className="hidden sm:inline">{side.club?.name}</span>
               </Link>
             </div>
           ))}

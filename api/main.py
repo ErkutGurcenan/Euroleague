@@ -115,6 +115,7 @@ def game_dict(g: Game, clubs: dict[str, Club]) -> dict:
         return {
             "code": code,
             "name": club.name if club else code,
+            "shortName": (club.abbreviated_name or club.name) if club else code,
             "crestUrl": club.crest_url if club else None,
             "score": score,
         }
