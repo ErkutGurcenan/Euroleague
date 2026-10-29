@@ -31,6 +31,7 @@ from euroleague_pipeline.models import (  # noqa: E402
     GameReferee,
     ImpactSeason,
     LineupStint,
+    LiveDetail,
     LiveGame,
     MarketSnapshot,
     PaperTrade,
@@ -1378,8 +1379,9 @@ def prediction_history(season: str = DEFAULT_SEASON) -> dict:
 LIVE_FINAL_SHOWN = timedelta(hours=3)  # finished games stay in the live list this long
 
 
-def live_dict(r: LiveGame, g: Game, clubs: dict[str, Club]) -> dict:
+def live_dict(r: LiveGame, g: Game, clubs: dict[str, Club], detail: Optional[LiveDetail] = None) -> dict:
     quarters = json.loads(r.quarters) if r.quarters else {"home": [], "away": []}
+    points = json.loads(detail.win_probs) if detail and detail.win_probs else []
     return {
         "id": g.id, "season": r.season_code, "gameCode": r.game_code, "status": r.status,
         "utcDate": g.utc_date.isoformat() + "Z" if g.utc_date else None,
@@ -1388,13 +1390,15 @@ def live_dict(r: LiveGame, g: Game, clubs: dict[str, Club]) -> dict:
         "homeScore": r.home_score, "awayScore": r.away_score,
         "quarter": r.quarter, "clock": r.clock, "quarters": quarters,
         "updatedAt": r.updated_at.isoformat() + "Z", "imported": bool(g.played),
+        "homeWinProb": points[-1][1] if points else None,
     }
 
 
 @app.get("/api/live")
-def live_scores(season: str = DEFAULT_SEASON) -> dict:
+def live_scores(season: str = DEFAULT_SEASON, game: Optional[int] = None) -> dict:
     """Games being played now, and those finished in the last 3 hours, from
-    the live feed (pipeline live.py). active = worth checking again soon."""
+    the live feed (pipeline live.py). active = worth checking again soon.
+    With game=N, also that game's live box score and win-probability line."""
     now = datetime.utcnow()
     with Session(engine) as session:
         clubs = load_clubs(session)
@@ -1403,16 +1407,24 @@ def live_scores(season: str = DEFAULT_SEASON) -> dict:
                                         & (Game.game_code == LiveGame.game_code))
             .where(LiveGame.season_code == season, LiveGame.updated_at >= now - timedelta(hours=6))
         ).all()
+        details = {d.game_code: d for d in session.execute(
+            select(LiveDetail).where(LiveDetail.season_code == season,
+                                     LiveDetail.game_code.in_([r.game_code for r, _ in rows]))).scalars()}
         upcoming = session.execute(
             select(func.count()).select_from(Game).where(
                 Game.season_code == season, Game.played.is_(False),
                 Game.utc_date >= now - timedelta(hours=3), Game.utc_date <= now + timedelta(minutes=60))
         ).scalar()
-    games = [live_dict(r, g, clubs) for r, g in rows
+    games = [live_dict(r, g, clubs, details.get(r.game_code)) for r, g in rows
              if r.status == "live" or (r.status == "final" and r.final_at and now - r.final_at <= LIVE_FINAL_SHOWN)]
+    detail = None
+    if game is not None and game in details:
+        d = details[game]
+        detail = {"gameCode": game, "box": json.loads(d.boxscore) if d.boxscore else None,
+                  "winProbs": json.loads(d.win_probs) if d.win_probs else []}
     games.sort(key=lambda d: (d["status"] != "live", d["utcDate"] or ""))
     return {"games": games, "active": upcoming > 0 or any(d["status"] == "live" for d in games),
-            "updatedAt": now.isoformat() + "Z"}
+            "updatedAt": now.isoformat() + "Z", "detail": detail}
 
 
 def applies_to_round(rounds: str, round_no: Optional[int]) -> bool:

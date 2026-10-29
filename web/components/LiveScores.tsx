@@ -2,7 +2,7 @@
 
 import Link from "@/components/Link";
 import { createContext, useContext, useEffect, useState } from "react";
-import type { ClubBadge, LiveGame, LiveScores } from "@/lib/api";
+import type { ClubBadge, LiveBoxPlayer, LiveGame, LiveScores } from "@/lib/api";
 
 const POLL_MS = 30_000;
 const LiveContext = createContext<LiveScores | null>(null);
@@ -10,7 +10,12 @@ const LiveContext = createContext<LiveScores | null>(null);
 /** Holds the page's live scores and re-reads them every 30 seconds while a
     game is on or about to start (and the tab is visible); stops otherwise.
     Without a provider the live pieces below simply show their fallback. */
-export function LiveScoresProvider({ initial, children }: { initial: LiveScores | null; children: React.ReactNode }) {
+export function LiveScoresProvider({ initial, query = "", children }: {
+  initial: LiveScores | null;
+  /** e.g. "?game=81&season=E2026" to also get that game's box score and win probability */
+  query?: string;
+  children: React.ReactNode;
+}) {
   const [data, setData] = useState<LiveScores | null>(initial);
   const active = data?.active ?? false;
   useEffect(() => {
@@ -19,7 +24,7 @@ export function LiveScoresProvider({ initial, children }: { initial: LiveScores 
     const id = window.setInterval(async () => {
       if (document.visibilityState !== "visible") return;
       try {
-        const res = await fetch("/live-scores", { cache: "no-store" });
+        const res = await fetch(`/live-scores${query}`, { cache: "no-store" });
         if (res.ok && !stopped) setData(await res.json());
       } catch {
         // keep the last scores and try again next time
@@ -29,7 +34,7 @@ export function LiveScoresProvider({ initial, children }: { initial: LiveScores 
       stopped = true;
       window.clearInterval(id);
     };
-  }, [active]);
+  }, [active, query]);
   return <LiveContext.Provider value={data}>{children}</LiveContext.Provider>;
 }
 
@@ -39,6 +44,35 @@ function useLiveGame(key: { id?: string; season?: string; gameCode: number }): L
   const g = useContext(LiveContext)?.games.find((x) =>
     key.id ? x.id === key.id : x.season === key.season && x.gameCode === key.gameCode);
   return g && g.status !== "scheduled" && !g.imported ? g : undefined;
+}
+
+function useLiveDetail(gameCode: number) {
+  const detail = useContext(LiveContext)?.detail;
+  return detail && detail.gameCode === gameCode ? detail : null;
+}
+
+function pct(p: number): string {
+  return `${Math.round(p * 100)}%`;
+}
+
+/** The home team's win probability through the game so far: 0-40 minutes
+    (plus any overtime) across, 0-100% up, 50% dashed. */
+function WinProbChart({ points, homeName, awayName }: { points: [number, number][]; homeName: string; awayName: string }) {
+  if (points.length < 2) return null;
+  const end = Math.max(40, points[points.length - 1][0]);
+  const x = (m: number) => 4 + (m / end) * 292;
+  const y = (p: number) => 4 + (1 - p) * 72;
+  return (
+    <svg viewBox="0 0 300 80" className="w-full" role="img"
+      aria-label={`${homeName} win probability during the game`}>
+      <line x1="4" x2="296" y1={y(0.5)} y2={y(0.5)} stroke="#404040" strokeDasharray="3 3" />
+      {[10, 20, 30].map((m) => <line key={m} x1={x(m)} x2={x(m)} y1="4" y2="76" stroke="#262626" />)}
+      <text x="6" y="12" fontSize="8" fill="#737373">{homeName}</text>
+      <text x="6" y="74" fontSize="8" fill="#737373">{awayName}</text>
+      <polyline points={points.map(([m, p]) => `${x(m).toFixed(1)},${y(p).toFixed(1)}`).join(" ")}
+        fill="none" stroke="#fb923c" strokeWidth="2" strokeLinejoin="round" />
+    </svg>
+  );
 }
 
 /** "Q3 04:12", "Half-time", "OT 02:10", "Final" */
@@ -154,6 +188,7 @@ export function LiveScoreboard({ season, gameCode, homeName, awayName, children 
   children: React.ReactNode;
 }) {
   const g = useLiveGame({ season, gameCode });
+  const detail = useLiveDetail(gameCode);
   if (!g) return <>{children}</>;
   const q = Number(g.quarter);
   const overtime = g.status === "final"
@@ -174,6 +209,18 @@ export function LiveScoreboard({ season, gameCode, homeName, awayName, children 
         <span className="text-lg text-neutral-500">:</span>
         <span>{g.awayScore ?? 0}</span>
       </div>
+      {g.homeWinProb !== null && (
+        <div className="grid w-full max-w-sm gap-1">
+          <div className="flex justify-between text-xs text-neutral-400">
+            <span>Win probability</span>
+            <span className="tabular-nums">{`${homeName} ${pct(g.homeWinProb)} · ${awayName} ${pct(1 - g.homeWinProb)}`}</span>
+          </div>
+          <div className="flex h-2 overflow-hidden rounded bg-neutral-800">
+            <div className="bg-orange-500" style={{ width: `${g.homeWinProb * 100}%` }} />
+          </div>
+          {detail && <WinProbChart points={detail.winProbs} homeName={homeName} awayName={awayName} />}
+        </div>
+      )}
       <table className="text-sm tabular-nums text-neutral-200">
         <thead>
           <tr className="text-xs uppercase text-neutral-600">
@@ -192,9 +239,69 @@ export function LiveScoreboard({ season, gameCode, homeName, awayName, children 
       </table>
       <p className="text-xs text-neutral-500">
         {g.status === "live"
-          ? "Updates every 30 seconds from the official live feed."
+          ? "Updates every 30 seconds from the official live feed. The win probability starts from our pre-game call and moves with the score and the clock."
           : "The full box score and stats arrive in a few minutes."}
       </p>
     </div>
   );
 }
+
+function BoxTable({ name, players }: { name: string; players: LiveBoxPlayer[] }) {
+  return (
+    <div className="overflow-x-auto rounded-lg border border-neutral-800">
+      <table className="w-full whitespace-nowrap text-sm tabular-nums">
+        <thead className="bg-neutral-900 text-left text-xs uppercase text-neutral-400">
+          <tr>
+            <th className="px-3 py-2">{name}</th>
+            {["Min", "Pts", "Reb", "Ast", "PIR"].map((h) => <th key={h} className="px-2 py-2 text-right">{h}</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          {players.map((p) => (
+            <tr key={`${p.no}-${p.name}`} className="border-t border-neutral-800/60">
+              <td className="px-3 py-1.5">
+                <span className="mr-1.5 inline-block w-5 text-right text-xs text-neutral-500">{p.no}</span>
+                <span className={p.starter ? "font-semibold" : ""}>{p.name}</span>
+                {p.on && <span className="ml-1.5 rounded bg-emerald-500/15 px-1 text-[10px] text-emerald-400">on court</span>}
+              </td>
+              {p.min === "DNP" || !p.min ? (
+                <td colSpan={5} className="px-2 py-1.5 text-right text-xs text-neutral-500">did not play</td>
+              ) : (
+                [p.min, p.pts, p.reb, p.ast, p.pir].map((v, i) => (
+                  <td key={i} className="px-2 py-1.5 text-right">{v ?? "–"}</td>
+                ))
+              )}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/** Match page: the live box score while the game is on (from the official
+    live feed); the full box score replaces it once the result is imported. */
+export function LiveBoxScore({ season, gameCode, homeName, awayName }: {
+  season: string;
+  gameCode: number;
+  homeName: string;
+  awayName: string;
+}) {
+  const g = useLiveGame({ season, gameCode });
+  const detail = useLiveDetail(gameCode);
+  if (!g || !detail?.box) return null;
+  return (
+    <section className="mb-8 grid gap-3">
+      <h2 className="flex items-center gap-2 text-lg font-semibold">
+        {g.status === "live" && <LiveDot />}
+        Live box score
+      </h2>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <BoxTable name={homeName} players={detail.box.home.players} />
+        <BoxTable name={awayName} players={detail.box.away.players} />
+      </div>
+      <p className="text-xs text-neutral-500">Starters in bold. Updates every 30 seconds.</p>
+    </section>
+  );
+}
+

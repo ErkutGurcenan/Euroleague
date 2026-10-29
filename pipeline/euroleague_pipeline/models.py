@@ -506,3 +506,18 @@ class LiveGame(Base):
     final_at: Mapped[Optional[datetime]] = mapped_column(DateTime)  # first seen over
     import_tried_at: Mapped[Optional[datetime]] = mapped_column(DateTime)  # last importer run for it
 
+
+class LiveDetail(Base):
+    """Extras for a game being played (see live.py): the live box score and
+    the win probability after each read, for the match page."""
+
+    __tablename__ = "live_details"
+    __table_args__ = (UniqueConstraint("season_code", "game_code"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    season_code: Mapped[str] = mapped_column(String(8), index=True)
+    game_code: Mapped[int] = mapped_column(Integer)
+    boxscore: Mapped[Optional[str]] = mapped_column(Text)  # JSON: home/away players
+    win_probs: Mapped[Optional[str]] = mapped_column(Text)  # JSON: [[minutes played, home win prob], ...]
+    updated_at: Mapped[datetime] = mapped_column(DateTime)
+

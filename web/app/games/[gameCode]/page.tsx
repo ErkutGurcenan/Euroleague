@@ -2,7 +2,7 @@ import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import Headshot from "@/components/Headshot";
 import HeadToHead from "@/components/HeadToHead";
-import { LiveScoreboard, LiveScoresProvider } from "@/components/LiveScores";
+import { LiveBoxScore, LiveScoreboard, LiveScoresProvider } from "@/components/LiveScores";
 import { appliesToRound, isUnavailable, noteAndTimeline, StatusPill } from "@/components/InjuryStatus";
 import { PredictionCard } from "@/components/Predictions";
 import RotationChart from "@/components/RotationChart";
@@ -183,7 +183,7 @@ export default async function GamePage({
     soon ? getInjuries().catch(() => null) : null,
     game.played ? getRotation(game.gameCode, game.season).catch(() => null) : null,
     getGamePrediction(game.gameCode, game.season).catch(() => null),
-    !game.played && mayBeLive(game.utcDate) ? getLive().catch(() => null) : null,
+    !game.played && mayBeLive(game.utcDate) ? getLive(game.gameCode, game.season).catch(() => null) : null,
   ]);
   const unavailable =
     injuryReport && injuryReport.season === game.season
@@ -217,7 +217,7 @@ export default async function GamePage({
       </p>
 
       {/* scoreboard (live while the game is on) */}
-      <LiveScoresProvider initial={live}>
+      <LiveScoresProvider initial={live} query={`?game=${game.gameCode}&season=${game.season}`}>
       <div className="mb-8 rounded-lg border border-neutral-800 bg-neutral-900/40 p-4">
         <div className="flex items-center justify-between gap-4">
           {[home, away].map((side, i) => (
@@ -302,6 +302,12 @@ export default async function GamePage({
         )}
         </LiveScoreboard>
       </div>
+      <LiveBoxScore
+        season={game.season}
+        gameCode={game.gameCode}
+        homeName={home.club?.abbreviatedName ?? home.club?.code ?? ""}
+        awayName={away.club?.abbreviatedName ?? away.club?.code ?? ""}
+      />
       </LiveScoresProvider>
 
       {prediction?.available && (!prediction.result || prediction.result.preGame) && (

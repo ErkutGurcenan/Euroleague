@@ -1119,12 +1119,33 @@ export type LiveGame = {
   updatedAt: string;
   /** the full result is in our database (box score etc.) */
   imported: boolean;
+  /** home win probability now (pipeline winprob.py), null before the first read */
+  homeWinProb: number | null;
 };
 
-export type LiveScores = { games: LiveGame[]; active: boolean; updatedAt: string };
+export type LiveBoxPlayer = {
+  name: string | null;
+  no: string | null;
+  min: string | null;
+  pts: number | null;
+  reb: number | null;
+  ast: number | null;
+  pir: number | null;
+  on: boolean;
+  starter: boolean;
+};
 
-export function getLive() {
-  return get<LiveScores>("/api/live");
+export type LiveDetail = {
+  gameCode: number;
+  box: { home: { code: string; players: LiveBoxPlayer[] }; away: { code: string; players: LiveBoxPlayer[] } } | null;
+  /** [minutes played, home win probability] after each read */
+  winProbs: [number, number][];
+};
+
+export type LiveScores = { games: LiveGame[]; active: boolean; updatedAt: string; detail?: LiveDetail | null };
+
+export function getLive(game?: number, season?: string) {
+  return get<LiveScores>(`/api/live${qs({ game, season })}`);
 }
 
 export type PreviewTeam = ClubBadge & {
