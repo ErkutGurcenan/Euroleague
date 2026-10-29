@@ -184,7 +184,10 @@ def poll(session: Session, season: str, games: list[Game]) -> list[LiveGame]:
         if row.status == "final" and row.final_at is None:
             row.final_at = now
         if row.status != "scheduled":
-            update_detail(session, season, g, row, calls.get(g.game_code, 0.5), now)
+            try:  # the extras must never stop the live score itself
+                update_detail(session, season, g, row, calls.get(g.game_code, 0.5), now)
+            except Exception as exc:  # noqa: BLE001
+                log.warning("game %s: live extras failed: %s", g.game_code, exc)
         rows.append(row)
     session.commit()
     return rows
