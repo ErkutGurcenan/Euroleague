@@ -483,3 +483,26 @@ class InjurySnapshot(Base):
     source_updated: Mapped[Optional[datetime]] = mapped_column(DateTime)
     entries: Mapped[str] = mapped_column(Text)  # JSON rows as read: club, player, status, injury, expected return
     changed: Mapped[bool] = mapped_column(Boolean)  # differs from the previous read
+
+
+class LiveGame(Base):
+    """The latest state of a game from the official live feed (see live.py):
+    one row per game, rewritten every 30 seconds while it is played."""
+
+    __tablename__ = "live_games"
+    __table_args__ = (UniqueConstraint("season_code", "game_code"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    season_code: Mapped[str] = mapped_column(String(8), index=True)
+    game_code: Mapped[int] = mapped_column(Integer)
+    status: Mapped[str] = mapped_column(String(10))  # scheduled, live or final
+    home_score: Mapped[Optional[int]] = mapped_column(Integer)
+    away_score: Mapped[Optional[int]] = mapped_column(Integer)
+    quarter: Mapped[Optional[str]] = mapped_column(String(4))  # "1"-"4", "5"+ = overtime
+    clock: Mapped[Optional[str]] = mapped_column(String(8))  # time left in the period, "04:12"
+    game_time: Mapped[Optional[str]] = mapped_column(String(8))  # time played, "27:48"
+    quarters: Mapped[Optional[str]] = mapped_column(String(200))  # JSON: cumulative score after each period
+    updated_at: Mapped[datetime] = mapped_column(DateTime)
+    final_at: Mapped[Optional[datetime]] = mapped_column(DateTime)  # first seen over
+    import_tried_at: Mapped[Optional[datetime]] = mapped_column(DateTime)  # last importer run for it
+

@@ -1,7 +1,8 @@
 import Link from "next/link";
+import { LiveDateSlot, LiveSideScore } from "@/components/LiveScores";
 import type { Game, GameSide } from "@/lib/api";
 
-function Side({ side, won }: { side: GameSide; won: boolean }) {
+function Side({ side, won, gameId, which }: { side: GameSide; won: boolean; gameId: string; which: "home" | "away" }) {
   return (
     <div className="flex items-center justify-between gap-2">
       <Link
@@ -19,7 +20,7 @@ function Side({ side, won }: { side: GameSide; won: boolean }) {
           won ? "font-bold text-white" : "text-neutral-200"
         }`}
       >
-        {side.score ?? "–"}
+        <LiveSideScore id={gameId} side={which}>{side.score ?? "–"}</LiveSideScore>
       </span>
     </div>
   );
@@ -47,11 +48,11 @@ export default function GameCard({ game }: { game: Game }) {
         className="mb-2 flex justify-between text-xs text-neutral-500 hover:text-orange-400"
       >
         <span>{game.phaseType === "RS" ? game.roundName : game.groupName}</span>
-        <span>{date} UTC →</span>
+        <LiveDateSlot id={game.id}><span>{date} UTC →</span></LiveDateSlot>
       </Link>
       <div className="space-y-1.5">
-        <Side side={game.home} won={homeWon} />
-        <Side side={game.away} won={awayWon} />
+        <Side side={game.home} won={homeWon} gameId={game.id} which="home" />
+        <Side side={game.away} won={awayWon} gameId={game.id} which="away" />
       </div>
     </div>
   );

@@ -1,10 +1,12 @@
 import Link from "next/link";
 import GameCard from "@/components/GameCard";
+import { LiveScoresProvider, LiveStrip } from "@/components/LiveScores";
 import Headshot from "@/components/Headshot";
 import {
   getAwards,
   getGames,
   getHighs,
+  getLive,
   getPlayers,
   getSeasons,
   getStandings,
@@ -49,7 +51,7 @@ function LeaderRow({
 
 export default async function HomePage() {
   const season = await currentSeason();
-  const [standings, players, highs, games, awards, seasonList] =
+  const [standings, players, highs, games, awards, seasonList, live] =
     await Promise.all([
       getStandings(undefined, season),
       getPlayers(season),
@@ -57,6 +59,7 @@ export default async function HomePage() {
       getGames(season),
       getAwards(season),
       getSeasons().catch(() => null),
+      getLive().catch(() => null),
     ]);
   const label = seasonLabel(games.season);
   const seasonNote =
@@ -129,7 +132,9 @@ export default async function HomePage() {
   }));
 
   return (
+    <LiveScoresProvider initial={live}>
     <div>
+      <LiveStrip />
       {/* canceled-season banner (shown when there is no champion) */}
       {!champion && seasonNote && (
         <div className="mb-6 flex items-center gap-4 rounded-xl border border-neutral-700 bg-neutral-900/60 p-4">
@@ -404,5 +409,6 @@ export default async function HomePage() {
         )}
       </div>
     </div>
+    </LiveScoresProvider>
   );
 }
