@@ -19,10 +19,7 @@ export default function TeamPicker({
   const boxRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (query.trim().length < 2) {
-      setClubs([]);
-      return;
-    }
+    if (query.trim().length < 2) return; // the typing handler clears the results
     const controller = new AbortController();
     const t = setTimeout(async () => {
       try {
@@ -55,6 +52,7 @@ export default function TeamPicker({
   const pick = (code: string) => {
     setOpen(false);
     setQuery("");
+    setClubs([]);
     const params = new URLSearchParams(searchParams.toString());
     params.set(slot, code);
     router.push(`/compare/teams?${params.toString()}`);
@@ -66,7 +64,10 @@ export default function TeamPicker({
         type="search"
         value={query}
         placeholder={currentName ?? "Search a team…"}
-        onChange={(e) => setQuery(e.target.value)}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          if (e.target.value.trim().length < 2) setClubs([]);
+        }}
         onKeyDown={(e) => e.key === "Escape" && setOpen(false)}
         className="w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm placeholder-neutral-400 outline-none focus:border-orange-600"
       />
