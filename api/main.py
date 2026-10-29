@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import re
 import sys
 import unicodedata
@@ -45,6 +46,17 @@ from euroleague_pipeline.models import (  # noqa: E402
 )
 
 DB_PATH = REPO_ROOT / "db" / "euroleague.db"
+# Touched by pipeline/warm_caches.sh after every import (nightly refresh.sh and
+# live.py after a final buzzer). In-process caches are kept until it changes.
+DATA_VERSION = REPO_ROOT / "db" / "data_version"
+CACHE_MAX_AGE = 86400  # seconds; a safety net in case the marker isn't touched
+
+
+def data_version() -> float:
+    try:
+        return DATA_VERSION.stat().st_mtime
+    except OSError:
+        return 0.0
 engine = create_engine(f"sqlite:///{DB_PATH}", connect_args={"check_same_thread": False})
 
 app = FastAPI(title="Euroleague Stats API")
@@ -167,18 +179,12 @@ def seasons() -> dict:
         }
 
 
-_meta_cache: dict = {}
-
-
 @app.get("/api/meta")
 def meta() -> dict:
-    """Database-wide counts for the About page. Cached for an hour: the
-    counts scan large tables and only change with the nightly refresh."""
-    now = datetime.utcnow()
-    if _meta_cache and (now - _meta_cache["at"]).total_seconds() < 3600:
-        return _meta_cache["data"]
-    _meta_cache.update(at=now, data=_meta_uncached())
-    return _meta_cache["data"]
+    """Database-wide counts for the About page. They scan large tables (about
+    15 s cold), so they're kept until the data changes and rebuilt by
+    pipeline/warm_caches.sh straight after each import."""
+    return cached_data("meta", "", _meta_uncached)
 
 
 def _meta_uncached() -> dict:
@@ -848,14 +854,15 @@ def games(
         }
 
 
-_comeback_cache: dict[str, dict[int, int]] = {}
+_comeback_cache: dict[tuple[str, float], dict[int, int]] = {}
 
 
 def winner_max_deficits(session, season: str) -> dict[int, int]:
     """Per game: the eventual winner's largest deficit, from the pbp
-    running score. Computed once per season and cached in-process."""
-    if season in _comeback_cache:
-        return _comeback_cache[season]
+    running score. Cached per season until the data changes."""
+    key = (season, data_version())
+    if key in _comeback_cache:
+        return _comeback_cache[key]
     winners: dict[int, bool] = {}  # game_code -> home team won
     for gm in session.execute(
         select(Game).where(Game.season_code == season, Game.played)
@@ -877,7 +884,8 @@ def winner_max_deficits(session, season: str) -> dict[int, int]:
         deficit = (pts_road - pts_home) if home_won else (pts_home - pts_road)
         if deficit > deficits.get(game_code, 0):
             deficits[game_code] = deficit
-    _comeback_cache[season] = deficits
+    _comeback_cache.clear()  # older data versions
+    _comeback_cache[key] = deficits
     return deficits
 
 
@@ -2804,21 +2812,23 @@ def club_badge(clubs: dict[str, Club], code: str) -> dict:
 _league_cache: dict[tuple, tuple] = {}
 
 
-def cached_hour(name: str, season: str, compute) -> dict:
-    """League-wide aggregates scan a whole season of stints and only change
-    with the nightly refresh, so keep each result for an hour."""
+def cached_data(name: str, season: str, compute) -> dict:
+    """League-wide aggregates scan large tables and only change when new data
+    is imported: keep each result until the data version changes (or for a
+    day at most)."""
+    version = data_version()
     hit = _league_cache.get((name, season))
     now = datetime.utcnow()
-    if hit and (now - hit[0]).total_seconds() < 3600:
-        return hit[1]
+    if hit and hit[1] == version and (now - hit[0]).total_seconds() < CACHE_MAX_AGE:
+        return hit[2]
     value = compute()
-    _league_cache[(name, season)] = (now, value)
+    _league_cache[(name, season)] = (now, version, value)
     return value
 
 
 @app.get("/api/lineups")
 def league_lineups(season: str = DEFAULT_SEASON) -> dict:
-    return cached_hour("lineups", season, lambda: _league_lineups(season))
+    return cached_data("lineups", season, lambda: _league_lineups(season))
 
 
 def _league_lineups(season: str) -> dict:
@@ -3078,7 +3088,7 @@ def player_impact(player_code: str, season: str = DEFAULT_SEASON) -> dict:
 
 @app.get("/api/impact")
 def league_onoff(season: str = DEFAULT_SEASON) -> dict:
-    return cached_hour("impact", season, lambda: _league_onoff(season))
+    return cached_data("impact", season, lambda: _league_onoff(season))
 
 
 def _league_onoff(season: str) -> dict:

@@ -172,6 +172,9 @@ def import_finished(session: Session, season: str, now: datetime, db: Path) -> N
         if imported:
             from .market import settle
             log.info("settled %d paper trades", settle(session, season, datetime.utcnow()))
+            # new results: refresh the API's caches in the background (warm_caches.sh)
+            subprocess.Popen([str(PIPELINE / "warm_caches.sh")], stdout=subprocess.DEVNULL,
+                             stderr=subprocess.DEVNULL, start_new_session=True)
 
 
 def main(argv: list[str] | None = None) -> int:

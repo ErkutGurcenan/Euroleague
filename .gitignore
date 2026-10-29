@@ -15,6 +15,7 @@ web/out/
 .env
 .env.local
 db/injuries.json
+db/data_version
 
 # Editors / OS
 .vscode/
