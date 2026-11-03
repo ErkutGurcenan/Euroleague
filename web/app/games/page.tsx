@@ -1,6 +1,6 @@
 export const metadata = { title: "Games" };
 
-import Link from "next/link";
+import Link from "@/components/Link";
 import GameCard from "@/components/GameCard";
 import { LiveScoresProvider } from "@/components/LiveScores";
 import Headshot from "@/components/Headshot";

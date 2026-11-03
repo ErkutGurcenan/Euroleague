@@ -4,7 +4,7 @@ export const metadata = {
     "Eurostepper is an independent EuroLeague stats and analytics site: box scores, shot charts, play-by-play and history since 2016-17.",
 };
 
-import Link from "next/link";
+import Link from "@/components/Link";
 import Logo from "@/components/Logo";
 import { getMeta } from "@/lib/api";
 

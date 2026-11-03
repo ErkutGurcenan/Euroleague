@@ -1,6 +1,6 @@
 export const metadata = { title: "Injury report" };
 
-import Link from "next/link";
+import Link from "@/components/Link";
 import Headshot from "@/components/Headshot";
 import { isUnavailable, noteAndTimeline, noteText, StatusPill, timeline } from "@/components/InjuryStatus";
 import { getInjuries, type InjuryEntry } from "@/lib/api";

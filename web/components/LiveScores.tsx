@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/Link";
 import { createContext, useContext, useEffect, useState } from "react";
 import type { ClubBadge, LiveGame, LiveScores } from "@/lib/api";
 

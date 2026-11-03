@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import type { HeadToHead } from "@/lib/api";
 
 function MeetingRow({

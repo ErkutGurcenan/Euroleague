@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import GameCard from "@/components/GameCard";
 import { LiveScoresProvider, LiveStrip } from "@/components/LiveScores";
 import Headshot from "@/components/Headshot";

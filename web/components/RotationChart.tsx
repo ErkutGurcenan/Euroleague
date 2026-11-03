@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import type { Rotation, RotationTeam } from "@/lib/api";
 
 type Available = Extract<Rotation, { available: true }>;

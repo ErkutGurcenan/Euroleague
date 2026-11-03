@@ -1,6 +1,6 @@
 export const metadata = { title: "Players" };
 
-import Link from "next/link";
+import Link from "@/components/Link";
 import Headshot from "@/components/Headshot";
 import PlayersToggle from "@/components/PlayersToggle";
 import TeamFilterSelect from "@/components/TeamFilterSelect";

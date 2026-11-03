@@ -1,6 +1,6 @@
 export const metadata = { title: "Notable games" };
 
-import Link from "next/link";
+import Link from "@/components/Link";
 import { getNotableGames, type NotableEntry } from "@/lib/api";
 import { currentSeason } from "@/lib/season";
 

@@ -1,6 +1,6 @@
 export const metadata = { title: "Season highs" };
 
-import Link from "next/link";
+import Link from "@/components/Link";
 import { getHighs } from "@/lib/api";
 import { currentSeason } from "@/lib/season";
 

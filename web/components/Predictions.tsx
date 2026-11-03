@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import type { ClubBadge, PaperGame, PaperTrade, Prediction, PredictionsOverview, StrategySummary } from "@/lib/api";
 
 function pct(p: number): string {

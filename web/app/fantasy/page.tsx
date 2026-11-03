@@ -1,6 +1,6 @@
 export const metadata = { title: "Fantasy" };
 
-import Link from "next/link";
+import Link from "@/components/Link";
 import Headshot from "@/components/Headshot";
 import { StatusPill } from "@/components/InjuryStatus";
 import PlayersToggle from "@/components/PlayersToggle";

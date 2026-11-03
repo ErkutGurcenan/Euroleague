@@ -1,6 +1,6 @@
 export const metadata = { title: "Compare players" };
 
-import Link from "next/link";
+import Link from "@/components/Link";
 import Headshot from "@/components/Headshot";
 import PlayerPicker from "@/components/PlayerPicker";
 import ShotChart from "@/components/ShotChart";
