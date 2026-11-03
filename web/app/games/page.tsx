@@ -2,8 +2,9 @@ export const metadata = { title: "Games" };
 
 import Link from "next/link";
 import GameCard from "@/components/GameCard";
+import { LiveScoresProvider } from "@/components/LiveScores";
 import Headshot from "@/components/Headshot";
-import { getGames, getRoundMvp, type Game } from "@/lib/api";
+import { getGames, getLive, getRoundMvp, type Game } from "@/lib/api";
 import { currentSeason } from "@/lib/season";
 
 const PHASES: Record<string, string> = {
@@ -110,7 +111,7 @@ export default async function GamesPage({
 }) {
   const params = await searchParams;
   const season = await currentSeason();
-  const { games: allGames } = await getGames(season);
+  const [{ games: allGames }, live] = await Promise.all([getGames(season), getLive().catch(() => null)]);
 
   const rsRounds = [
     ...new Set(
@@ -223,6 +224,7 @@ export default async function GamesPage({
   }
 
   return (
+    <LiveScoresProvider initial={live}>
     <div>
       <div className="mb-4 flex items-baseline justify-between gap-3">
         <h1 className="text-2xl font-bold">Games</h1>
@@ -305,5 +307,6 @@ export default async function GamesPage({
 
       {content}
     </div>
+    </LiveScoresProvider>
   );
 }

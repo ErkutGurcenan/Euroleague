@@ -1,4 +1,4 @@
-const API_URL = process.env.API_URL ?? "http://localhost:8000";
+export const API_URL = process.env.API_URL ?? "http://localhost:8000";
 
 export type ClubSummary = {
   code: string;
@@ -1096,3 +1096,31 @@ export type SearchResults = {
     clubName: string | null;
   }[];
 };
+
+/** A game being played now (or just finished), from the official live feed. */
+export type LiveGame = {
+  id: string;
+  season: string;
+  gameCode: number;
+  status: "scheduled" | "live" | "final";
+  utcDate: string | null;
+  roundName: string | null;
+  home: ClubBadge;
+  away: ClubBadge;
+  homeScore: number | null;
+  awayScore: number | null;
+  quarter: string | null;
+  clock: string | null;
+  /** score after each period, Q1-Q4 then overtime (0 for periods not played yet) */
+  quarters: { home: (number | null)[]; away: (number | null)[] };
+  updatedAt: string;
+  /** the full result is in our database (box score etc.) */
+  imported: boolean;
+};
+
+export type LiveScores = { games: LiveGame[]; active: boolean; updatedAt: string };
+
+export function getLive() {
+  return get<LiveScores>("/api/live");
+}
+

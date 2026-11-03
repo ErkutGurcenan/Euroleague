@@ -9,7 +9,7 @@ import math
 import re
 import sys
 import unicodedata
-from datetime import datetime
+from datetime import datetime, timedelta
 from itertools import combinations
 from pathlib import Path
 from typing import Optional
@@ -30,6 +30,7 @@ from euroleague_pipeline.models import (  # noqa: E402
     GameReferee,
     ImpactSeason,
     LineupStint,
+    LiveGame,
     MarketSnapshot,
     PaperTrade,
     PbpEvent,
@@ -1362,6 +1363,46 @@ def prediction_history(season: str = DEFAULT_SEASON) -> dict:
                    for (rnd, name), rows in sorted(by_round.items(), key=lambda kv: kv[0][0], reverse=True)],
         "games": games,
     }
+
+
+LIVE_FINAL_SHOWN = timedelta(hours=3)  # finished games stay in the live list this long
+
+
+def live_dict(r: LiveGame, g: Game, clubs: dict[str, Club]) -> dict:
+    quarters = json.loads(r.quarters) if r.quarters else {"home": [], "away": []}
+    return {
+        "id": g.id, "season": r.season_code, "gameCode": r.game_code, "status": r.status,
+        "utcDate": g.utc_date.isoformat() + "Z" if g.utc_date else None,
+        "roundName": g.round_name if g.phase_type == "RS" else (g.group_name or g.round_name),
+        "home": club_badge(clubs, g.local_club_code), "away": club_badge(clubs, g.road_club_code),
+        "homeScore": r.home_score, "awayScore": r.away_score,
+        "quarter": r.quarter, "clock": r.clock, "quarters": quarters,
+        "updatedAt": r.updated_at.isoformat() + "Z", "imported": bool(g.played),
+    }
+
+
+@app.get("/api/live")
+def live_scores(season: str = DEFAULT_SEASON) -> dict:
+    """Games being played now, and those finished in the last 3 hours, from
+    the live feed (pipeline live.py). active = worth checking again soon."""
+    now = datetime.utcnow()
+    with Session(engine) as session:
+        clubs = load_clubs(session)
+        rows = session.execute(
+            select(LiveGame, Game).join(Game, (Game.season_code == LiveGame.season_code)
+                                        & (Game.game_code == LiveGame.game_code))
+            .where(LiveGame.season_code == season, LiveGame.updated_at >= now - timedelta(hours=6))
+        ).all()
+        upcoming = session.execute(
+            select(func.count()).select_from(Game).where(
+                Game.season_code == season, Game.played.is_(False),
+                Game.utc_date >= now - timedelta(hours=3), Game.utc_date <= now + timedelta(minutes=60))
+        ).scalar()
+    games = [live_dict(r, g, clubs) for r, g in rows
+             if r.status == "live" or (r.status == "final" and r.final_at and now - r.final_at <= LIVE_FINAL_SHOWN)]
+    games.sort(key=lambda d: (d["status"] != "live", d["utcDate"] or ""))
+    return {"games": games, "active": upcoming > 0 or any(d["status"] == "live" for d in games),
+            "updatedAt": now.isoformat() + "Z"}
 
 
 @app.get("/api/games/{game_code}/rotation")

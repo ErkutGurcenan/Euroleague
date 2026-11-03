@@ -2,11 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import Headshot from "@/components/Headshot";
 import HeadToHead from "@/components/HeadToHead";
+import { LiveScoreboard, LiveScoresProvider } from "@/components/LiveScores";
 import { appliesToRound, isUnavailable, noteAndTimeline, StatusPill } from "@/components/InjuryStatus";
 import { PredictionCard } from "@/components/Predictions";
 import RotationChart from "@/components/RotationChart";
 import ShotChart from "@/components/ShotChart";
-import { getGame, getGamePrediction, getHeadToHead, getInjuries, getRotation, type GameDetailSide } from "@/lib/api";
+import { getGame, getGamePrediction, getHeadToHead, getInjuries, getLive, getRotation, type GameDetailSide } from "@/lib/api";
 import { currentSeason } from "@/lib/season";
 
 function BoxScoreTable({ side }: { side: GameDetailSide }) {
@@ -149,6 +150,13 @@ export async function generateMetadata({
   }
 }
 
+/** Tip-off between 4 hours ago and an hour from now: the game may be on. */
+function mayBeLive(utcDate: string | null): boolean {
+  if (!utcDate) return false;
+  const t = new Date(utcDate).getTime() - Date.now();
+  return t > -4 * 3600 * 1000 && t < 3600 * 1000;
+}
+
 function startsWithinDays(utcDate: string | null, days: number): boolean {
   return !!utcDate && new Date(utcDate).getTime() - Date.now() < days * 24 * 3600 * 1000;
 }
@@ -168,13 +176,14 @@ export default async function GamePage({
   const { home, away } = game;
   // A current injury report says little about games weeks away.
   const soon = !game.played && startsWithinDays(game.utcDate, 14);
-  const [h2h, injuryReport, rotation, prediction] = await Promise.all([
+  const [h2h, injuryReport, rotation, prediction, live] = await Promise.all([
     home.club && away.club
       ? getHeadToHead(home.club.code, away.club.code).catch(() => null)
       : null,
     soon ? getInjuries().catch(() => null) : null,
     game.played ? getRotation(game.gameCode, game.season).catch(() => null) : null,
     getGamePrediction(game.gameCode, game.season).catch(() => null),
+    !game.played && mayBeLive(game.utcDate) ? getLive().catch(() => null) : null,
   ]);
   const unavailable =
     injuryReport && injuryReport.season === game.season
@@ -207,7 +216,8 @@ export default async function GamePage({
         {game.phaseType === "RS" ? game.roundName : game.groupName} · {date} UTC
       </p>
 
-      {/* scoreboard */}
+      {/* scoreboard (live while the game is on) */}
+      <LiveScoresProvider initial={live}>
       <div className="mb-8 rounded-lg border border-neutral-800 bg-neutral-900/40 p-4">
         <div className="flex items-center justify-between gap-4">
           {[home, away].map((side, i) => (
@@ -234,6 +244,12 @@ export default async function GamePage({
             </div>
           ))}
         </div>
+        <LiveScoreboard
+          season={game.season}
+          gameCode={game.gameCode}
+          homeName={home.club?.abbreviatedName ?? home.club?.code ?? ""}
+          awayName={away.club?.abbreviatedName ?? away.club?.code ?? ""}
+        >
         <div className="mt-3 flex items-center justify-center gap-6 text-4xl font-bold tabular-nums">
           <span
             className={
@@ -283,7 +299,9 @@ export default async function GamePage({
             </tbody>
           </table>
         )}
+        </LiveScoreboard>
       </div>
+      </LiveScoresProvider>
 
       {prediction?.available && (!prediction.result || prediction.result.preGame) && (
         <>

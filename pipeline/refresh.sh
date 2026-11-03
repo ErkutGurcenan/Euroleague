@@ -21,7 +21,9 @@ else
 fi
 
 exec 9>/tmp/euroleague-refresh.lock
-if ! flock -n 9; then
+# live.py takes the same lock to import a game right after the final buzzer:
+# wait for it (up to 15 minutes) rather than skipping the night
+if ! flock -w 900 9; then
   echo "$(date -Is) refresh already running, skipping"
   exit 0
 fi
