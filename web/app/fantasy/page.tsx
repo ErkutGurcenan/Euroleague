@@ -6,6 +6,7 @@ import { StatusPill } from "@/components/InjuryStatus";
 import PlayersToggle from "@/components/PlayersToggle";
 import TeamFilterSelect from "@/components/TeamFilterSelect";
 import { getFantasy, type FantasyPlayer, type FantasyWatchList } from "@/lib/api";
+import { clubAbbr } from "@/lib/clubs";
 import { currentSeason } from "@/lib/season";
 
 const POSITIONS = ["Guard", "Forward", "Center"];
@@ -271,7 +272,7 @@ export default async function FantasyPage({
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={p.clubCrest} alt="" className="h-4 w-4 object-contain" />
                       )}
-                      {p.clubCode}
+                      {clubAbbr(p.clubCode)}
                     </Link>
                   </td>
                   <td className="px-2 py-2 text-right text-neutral-400">{p.gamesPlayed}</td>

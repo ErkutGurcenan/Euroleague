@@ -1,5 +1,6 @@
 import Link from "@/components/Link";
 import type { AdjustedImpact, PlayerImpactData } from "@/lib/api";
+import { clubAbbr } from "@/lib/clubs";
 
 export const ADJUSTED_NOTE =
   "Adjusted impact estimates the points per 100 possessions a player adds compared with an average EuroLeague player, after accounting for every teammate and opponent he shared the court with. It is fitted on every stint of the season, starting from his earlier seasons, and the range shows how sure the estimate is (90%).";
@@ -76,7 +77,7 @@ export function AdjustedLeaderboard({ data, limit = 50 }: { data: AdjustedImpact
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={p.clubCrest} alt="" className="h-4 w-4 object-contain" />
                     )}
-                    {p.clubCode}
+                    {clubAbbr(p.clubCode)}
                   </Link>
                 </td>
                 <td className="px-2 py-2 text-right tabular-nums text-neutral-400">{p.minutes.toFixed(0)}</td>
@@ -158,7 +159,7 @@ export function PlayerAdjusted({ data }: { data: PlayerImpactData }) {
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={h.clubCrest} alt="" className="h-4 w-4 object-contain" />
                       )}
-                      {h.clubCode}
+                      {clubAbbr(h.clubCode)}
                     </span>
                   </td>
                   <td className="px-2 py-1.5 text-right tabular-nums text-neutral-400">{h.minutes.toFixed(0)}</td>

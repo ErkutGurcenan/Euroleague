@@ -4,6 +4,7 @@ import Link from "@/components/Link";
 import Headshot from "@/components/Headshot";
 import { isUnavailable, noteAndTimeline, noteText, StatusPill, timeline } from "@/components/InjuryStatus";
 import { getInjuries, type InjuryEntry } from "@/lib/api";
+import { clubAbbr } from "@/lib/clubs";
 import { seasonLabel } from "@/lib/season";
 
 const REASON_LABELS: Record<InjuryEntry["reason"], string> = {
@@ -172,7 +173,7 @@ export default async function InjuriesPage() {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 text-sm">
                     <PlayerName e={e} />
-                    <span className="text-xs text-neutral-500">{e.club}</span>
+                    <span className="text-xs text-neutral-500">{clubAbbr(e.club)}</span>
                   </div>
                   <div className="truncate text-xs text-neutral-400">{noteText(e.note)}</div>
                 </div>
@@ -210,7 +211,7 @@ export default async function InjuriesPage() {
                       <PlayerName e={e} />
                     </span>
                   </td>
-                  <td className="px-3 py-2 text-neutral-400">{e.club}</td>
+                  <td className="px-3 py-2 text-neutral-400">{clubAbbr(e.club)}</td>
                   <td className="px-3 py-2">
                     <StatusPill status={e.status} />
                   </td>

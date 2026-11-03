@@ -3,6 +3,7 @@ export const metadata = { title: "Roll of honor" };
 import Link from "@/components/Link";
 import Headshot from "@/components/Headshot";
 import { getHonorRoll, type HonorAward } from "@/lib/api";
+import { clubAbbr } from "@/lib/clubs";
 
 const AWARD_ICON: Record<string, string> = {
   MVP: "🏅",
@@ -29,7 +30,7 @@ function AwardCell({ award }: { award: HonorAward }) {
               alt=""
               className="h-3 w-3 object-contain"
             />
-            {award.clubCode}
+            {clubAbbr(award.clubCode)}
           </span>
         )}
       </span>

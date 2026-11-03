@@ -885,7 +885,8 @@ export type PredictionsOverview = {
       games: PaperGame[];
       series: {
         gameCode: number;
-        label: string;
+        home: string;
+        away: string;
         eurostepper: number;
         jev: number;
         eurostepper_pick?: number;
@@ -1149,6 +1150,7 @@ export function getLive(game?: number, season?: string) {
 }
 
 export type PreviewTeam = ClubBadge & {
+  shortName: string;
   position: number | null;
   wins: number;
   losses: number;

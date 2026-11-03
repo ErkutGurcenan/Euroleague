@@ -3,6 +3,7 @@
 import Link from "@/components/Link";
 import { createContext, useContext, useEffect, useState } from "react";
 import type { ClubBadge, LiveBoxPlayer, LiveGame, LiveScores } from "@/lib/api";
+import { clubAbbr } from "@/lib/clubs";
 
 const POLL_MS = 30_000;
 const LiveContext = createContext<LiveScores | null>(null);
@@ -127,11 +128,11 @@ export function LiveStrip() {
           >
             <span className="flex min-w-0 items-center gap-1.5 tabular-nums">
               <Crest team={g.home} />
-              <span>{g.home.clubCode}</span>
+              <span>{clubAbbr(g.home.clubCode)}</span>
               <span className="font-bold">{g.homeScore ?? 0}</span>
               <span className="text-neutral-500">–</span>
               <span className="font-bold">{g.awayScore ?? 0}</span>
-              <span>{g.away.clubCode}</span>
+              <span>{clubAbbr(g.away.clubCode)}</span>
               <Crest team={g.away} />
             </span>
             <span className={`shrink-0 text-xs ${g.status === "live" ? "text-red-400" : "text-neutral-400"}`}>

@@ -2,6 +2,7 @@ export const metadata = { title: "Champions" };
 
 import Link from "@/components/Link";
 import { getChampions } from "@/lib/api";
+import { clubAbbr } from "@/lib/clubs";
 
 export default async function ChampionsPage() {
   const { titlesByClub, finals, canceled } = await getChampions();
@@ -33,7 +34,7 @@ export default async function ChampionsPage() {
               <img src={t.crestUrl} alt="" className="h-10 w-10 object-contain" />
             )}
             <span className="text-2xl font-bold tabular-nums">{t.titles}</span>
-            <span className="truncate text-xs text-neutral-400">{t.code}</span>
+            <span className="truncate text-xs text-neutral-400">{clubAbbr(t.code)}</span>
           </Link>
         ))}
       </div>

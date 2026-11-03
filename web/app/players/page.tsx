@@ -5,6 +5,7 @@ import Headshot from "@/components/Headshot";
 import PlayersToggle from "@/components/PlayersToggle";
 import TeamFilterSelect from "@/components/TeamFilterSelect";
 import { getPlayers, getTransfers, type PlayerSummary } from "@/lib/api";
+import { clubAbbr } from "@/lib/clubs";
 import { currentSeason } from "@/lib/season";
 
 const POSITIONS = ["Guard", "Forward", "Center"];
@@ -150,7 +151,7 @@ export default async function PlayersPage({
                           className="h-4 w-4 object-contain"
                         />
                       )}
-                      {p.club.code}
+                      {clubAbbr(p.club.code)}
                     </Link>
                   )}
                 </td>
@@ -216,7 +217,7 @@ export default async function PlayersPage({
                       className="h-4 w-4 object-contain"
                     />
                   )}
-                  {t.from?.code}
+                  {clubAbbr(t.from?.code)}
                   <span className="text-neutral-600">→</span>
                   {t.to?.crestUrl && (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -226,7 +227,7 @@ export default async function PlayersPage({
                       className="h-4 w-4 object-contain"
                     />
                   )}
-                  {t.to?.code}
+                  {clubAbbr(t.to?.code)}
                 </span>
               </Link>
             ))}

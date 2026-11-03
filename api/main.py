@@ -1296,7 +1296,7 @@ def market_overview(graded: list[dict], ai_calls: dict, prices: dict[int, Market
         for k, t in done.items():
             if k in running:
                 running[k] += t["pnl"] or 0
-        series.append({"gameCode": row["gameCode"], "label": f"{row['home']['clubCode']} v {row['away']['clubCode']}",
+        series.append({"gameCode": row["gameCode"], "home": row["home"]["clubCode"], "away": row["away"]["clubCode"],
                        **{k: round(v, 2) for k, v in running.items()}})
 
     return {
@@ -1521,8 +1521,10 @@ def round_preview(round_no: int, season: str = DEFAULT_SEASON) -> dict:
 
     def team(code: str, g: Game) -> dict:
         row, form = table.get(code), splits.get(code, {}).get("form", [])
+        club = clubs.get(code)
         return {
             **club_badge(clubs, code),
+            "shortName": (club.abbreviated_name or club.name) if club else code,
             "position": row.position if row else None,
             "wins": row.games_won if row else 0, "losses": row.games_lost if row else 0,
             "form": form,

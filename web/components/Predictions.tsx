@@ -1,5 +1,6 @@
 import Link from "@/components/Link";
 import type { ClubBadge, PaperGame, PaperTrade, Prediction, PredictionsOverview, StrategySummary } from "@/lib/api";
+import { clubAbbr } from "@/lib/clubs";
 
 function pct(p: number): string {
   return `${Math.round(p * 100)}%`;
@@ -41,13 +42,13 @@ function Crest({ team, size = 20 }: { team: ClubBadge; size?: number }) {
 export function keyFactors(p: Prediction): string[] {
   const items: [number, string][] = [];
   const f = p.factors;
-  if (p.homeCourt && f.home_court) items.push([Math.abs(f.home_court), `Home court: ${p.home.clubCode}`]);
+  if (p.homeCourt && f.home_court) items.push([Math.abs(f.home_court), `Home court: ${clubAbbr(p.home.clubCode)}`]);
   if (f.rating_diff && Math.abs(p.ratingDiff) >= 5) {
-    const lead = p.ratingDiff > 0 ? p.home.clubCode : p.away.clubCode;
+    const lead = clubAbbr(p.ratingDiff > 0 ? p.home.clubCode : p.away.clubCode);
     items.push([Math.abs(f.rating_diff), `Power rating: ${lead} +${Math.round(Math.abs(p.ratingDiff))}`]);
   }
   if (f.net_diff && Math.abs(p.netDiff) >= 0.5) {
-    const lead = p.netDiff > 0 ? p.home.clubCode : p.away.clubCode;
+    const lead = clubAbbr(p.netDiff > 0 ? p.home.clubCode : p.away.clubCode);
     items.push([Math.abs(f.net_diff), `Efficiency: ${lead} +${Math.abs(p.netDiff).toFixed(1)} per 100`]);
   }
   return items.sort((a, b) => b[0] - a[0]).map(([, label]) => label);
@@ -59,16 +60,16 @@ function ProbBar({ p, height = "h-7" }: { p: Prediction; height?: string }) {
   return (
     <div className={`flex ${height} overflow-hidden rounded-md text-xs font-semibold`}>
       <div
-        className={`flex items-center px-2 ${homeFav ? "bg-orange-600 text-white" : "bg-neutral-800 text-neutral-300"}`}
+        className={`flex min-w-fit items-center whitespace-nowrap px-2 ${homeFav ? "bg-orange-600 text-white" : "bg-neutral-800 text-neutral-300"}`}
         style={{ width: `${Math.max(h, 0.12) * 100}%` }}
       >
-        {p.home.clubCode} {pct(h)}
+        {clubAbbr(p.home.clubCode)} {pct(h)}
       </div>
       <div
-        className={`flex items-center justify-end px-2 ${!homeFav ? "bg-orange-600 text-white" : "bg-neutral-800 text-neutral-300"}`}
+        className={`flex min-w-fit items-center justify-end whitespace-nowrap px-2 ${!homeFav ? "bg-orange-600 text-white" : "bg-neutral-800 text-neutral-300"}`}
         style={{ width: `${Math.max(1 - h, 0.12) * 100}%` }}
       >
-        {pct(1 - h)} {p.away.clubCode}
+        {pct(1 - h)} {clubAbbr(p.away.clubCode)}
       </div>
     </div>
   );
@@ -122,13 +123,13 @@ function MarketLine({ p }: { p: Prediction }) {
         <span className="text-neutral-400">{p.result ? "Polymarket before tip-off:" : "Polymarket:"}</span>
         <span className="font-semibold">{m.team.clubName} {pct(m.prob)}</span>
         <span className="text-xs text-neutral-500">
-          {p.market.bid !== null && p.market.ask !== null && `${p.home.clubCode} bid ${cents(p.market.bid)} · ask ${cents(p.market.ask)} · `}
+          {p.market.bid !== null && p.market.ask !== null && `${clubAbbr(p.home.clubCode)} bid ${cents(p.market.bid)} · ask ${cents(p.market.ask)} · `}
           {utcTime(p.market.capturedAt)} UTC
         </span>
       </div>
       {trades.map((t) => (
         <div key={t.strategy} className="text-xs text-neutral-400">
-          Paper trade, {STRATEGY_LABEL[t.strategy] ?? t.strategy}: bought {t.shares} {(t.side === "home" ? p.home : p.away).clubCode} shares at {cents(t.price ?? 0)}
+          Paper trade, {STRATEGY_LABEL[t.strategy] ?? t.strategy}: bought {t.shares} {clubAbbr((t.side === "home" ? p.home : p.away).clubCode)} shares at {cents(t.price ?? 0)}
           {t.pnl !== null ? (
             <>
               {" "}
@@ -175,7 +176,7 @@ export function PredictionCard({ p, compact = false }: { p: Prediction; compact?
       {p.ai && (!p.result || p.ai.preGame) && <AiLine p={p} compact={compact} />}
       <MarketLine p={p} />
       {!compact && <p className="text-xs text-neutral-500">
-        Ratings alone give {p.home.clubCode} {pct(p.eloHomeProb)}. The call combines power ratings,
+        Ratings alone give {clubAbbr(p.home.clubCode)} {pct(p.eloHomeProb)}. The call combines power ratings,
         season efficiency and home court, is updated every night and is locked at tip-off.{" "}
         <Link href="/predictions" className="text-orange-400 hover:underline">Track record →</Link>
       </p>}
@@ -211,14 +212,14 @@ export function UpcomingList({ items }: { items: Prediction[] }) {
               <td className="px-3 py-2 text-xs text-neutral-500">{when(p.utcDate)}</td>
               <td className="px-3 py-2">
                 <Link href={`/games/${p.gameCode}`} className="flex items-center gap-1.5 hover:text-orange-400">
-                  <Crest team={p.home} size={16} /> {p.home.clubCode}
+                  <Crest team={p.home} size={16} /> {clubAbbr(p.home.clubCode)}
                   <span className="text-neutral-600">v</span>
-                  <Crest team={p.away} size={16} /> {p.away.clubCode}
+                  <Crest team={p.away} size={16} /> {clubAbbr(p.away.clubCode)}
                 </Link>
               </td>
               <td className="min-w-[14rem] px-3 py-2"><ProbBar p={p} height="h-5" /></td>
               <td className="px-3 py-2 text-right tabular-nums text-neutral-300">
-                {Math.abs(p.homeMargin) < 0.5 ? "even" : `${p.homeMargin > 0 ? p.home.clubCode : p.away.clubCode} +${Math.abs(p.homeMargin).toFixed(1)}`}
+                {Math.abs(p.homeMargin) < 0.5 ? "even" : `${clubAbbr(p.homeMargin > 0 ? p.home.clubCode : p.away.clubCode)} +${Math.abs(p.homeMargin).toFixed(1)}`}
               </td>
               <td className="px-3 py-2 text-right tabular-nums">
                 {p.ai ? (() => {
@@ -226,7 +227,7 @@ export function UpcomingList({ items }: { items: Prediction[] }) {
                   const disagree = ai.team.clubCode !== favouriteOf(p.homeWinProb, p).team.clubCode;
                   return (
                     <span className={disagree ? "text-amber-300" : "text-neutral-400"} title={disagree ? "Jev picks a different winner" : undefined}>
-                      {ai.team.clubCode} {pct(ai.prob)}
+                      {clubAbbr(ai.team.clubCode)} {pct(ai.prob)}
                     </span>
                   );
                 })() : <span className="text-neutral-600">–</span>}
@@ -235,10 +236,10 @@ export function UpcomingList({ items }: { items: Prediction[] }) {
                 {p.market ? (() => {
                   const m = favouriteOf(p.market.homePrice, p);
                   const quote = p.market.bid !== null && p.market.ask !== null
-                    ? `${p.home.clubCode} bid ${cents(p.market.bid)} · ask ${cents(p.market.ask)} · ` : "";
+                    ? `${clubAbbr(p.home.clubCode)} bid ${cents(p.market.bid)} · ask ${cents(p.market.ask)} · ` : "";
                   return (
                     <span className="text-neutral-400" title={`${quote}${utcTime(p.market.capturedAt)} UTC`}>
-                      {m.team.clubCode} {pct(m.prob)}
+                      {clubAbbr(m.team.clubCode)} {pct(m.prob)}
                     </span>
                   );
                 })() : <span className="text-neutral-600">–</span>}
@@ -299,10 +300,10 @@ export function TrackRecord({ data }: { data: PredictionsOverview }) {
                 <tr key={p.gameCode} className="border-t border-neutral-800/60">
                   <td className="px-3 py-2">
                     <Link href={`/games/${p.gameCode}`} className="hover:text-orange-400">
-                      {p.home.clubCode} v {p.away.clubCode}
+                      {clubAbbr(p.home.clubCode)} v {clubAbbr(p.away.clubCode)}
                     </Link>
                   </td>
-                  <td className="px-3 py-2 text-neutral-300">{fav.clubCode} {pct(Math.max(p.homeWinProb, 1 - p.homeWinProb))}</td>
+                  <td className="px-3 py-2 text-neutral-300">{clubAbbr(fav.clubCode)} {pct(Math.max(p.homeWinProb, 1 - p.homeWinProb))}</td>
                   <td className="px-3 py-2 tabular-nums text-neutral-400">{p.result?.homeScore}–{p.result?.awayScore}</td>
                   <td className="px-3 py-2">
                     <span className={p.result?.correct ? "text-emerald-400" : "text-red-400"}>{p.result?.correct ? "✓" : "✗"}</span>
@@ -458,14 +459,14 @@ export function ChallengerPanel({ data }: { data: PredictionsOverview }) {
                   const right = (prob >= 0.5) === homeWon;
                   return (
                     <span className={right ? "text-emerald-400" : "text-red-400"}>
-                      {f.team.clubCode} {pct(f.prob)} {right ? "✓" : "✗"}
+                      {clubAbbr(f.team.clubCode)} {pct(f.prob)} {right ? "✓" : "✗"}
                     </span>
                   );
                 };
                 return (
                   <tr key={p.gameCode} className="border-t border-neutral-800/60">
                     <td className="px-3 py-2">
-                      <Link href={`/games/${p.gameCode}`} className="hover:text-orange-400">{p.home.clubCode} v {p.away.clubCode}</Link>
+                      <Link href={`/games/${p.gameCode}`} className="hover:text-orange-400">{clubAbbr(p.home.clubCode)} v {clubAbbr(p.away.clubCode)}</Link>
                     </td>
                     <td className="px-3 py-2 tabular-nums text-neutral-400">{p.result?.homeScore}–{p.result?.awayScore}</td>
                     <td className="px-3 py-2 tabular-nums">{call(p.homeWinProb)}</td>
@@ -593,7 +594,7 @@ function PnlChart({ series }: { series: PredictionsOverview["market"]["paper"]["
         {keys.map((k) =>
           series.map((r, i) => (
             <circle key={`${k}${r.gameCode}`} cx={x(i)} cy={y(val(r, k))} r="2.5" fill={LINE[k]}>
-              <title>{`${STRATEGY_LABEL[k]} after ${r.label}: ${money(val(r, k))}`}</title>
+              <title>{`${STRATEGY_LABEL[k]} after ${clubAbbr(r.home)} v ${clubAbbr(r.away)}: ${money(val(r, k))}`}</title>
             </circle>
           )),
         )}
@@ -612,9 +613,9 @@ function TradeCell({ t, g, showModel = true }: { t?: PaperTrade; g: PaperGame; s
   }
   const team = t.side === "home" ? g.home : g.away;
   return (
-    <span title={`Bought ${t.shares} ${team.clubCode} shares at ${cents(t.price)}: $${(t.cost ?? 0).toFixed(2)} plus $${(t.fee ?? 0).toFixed(2)} fee`}>
+    <span title={`Bought ${t.shares} ${clubAbbr(team.clubCode)} shares at ${cents(t.price)}: $${(t.cost ?? 0).toFixed(2)} plus $${(t.fee ?? 0).toFixed(2)} fee`}>
       {model}
-      <span className="text-neutral-300">→ {team.clubCode} {cents(t.price)}</span>{" "}
+      <span className="text-neutral-300">→ {clubAbbr(team.clubCode)} {cents(t.price)}</span>{" "}
       {t.status === "open" ? (
         <span className="text-neutral-500">open</span>
       ) : (
@@ -631,11 +632,11 @@ function NextTrades({ items }: { items: Prediction[] }) {
   const signal = (prob: number | undefined, p: Prediction) => {
     if (prob === undefined) return <span className="text-neutral-600">–</span>;
     const price = p.market!.homePrice;
-    const pick = prob === 0.5 ? "none" : (prob > 0.5 ? p.home : p.away).clubCode;
+    const pick = prob === 0.5 ? "none" : clubAbbr((prob > 0.5 ? p.home : p.away).clubCode);
     return (
       <span>
         <span className="text-neutral-500">{pct(prob)} </span>
-        <span className="text-neutral-300">{prob === price ? "no value trade" : `→ ${(prob > price ? p.home : p.away).clubCode}`}</span>
+        <span className="text-neutral-300">{prob === price ? "no value trade" : `→ ${clubAbbr((prob > price ? p.home : p.away).clubCode)}`}</span>
         <span className="text-neutral-500">{` · pick ${pick}`}</span>
       </span>
     );
@@ -661,7 +662,7 @@ function NextTrades({ items }: { items: Prediction[] }) {
               return (
                 <tr key={p.gameCode} className="border-t border-neutral-800/60">
                   <td className="px-3 py-2">
-                    <Link href={`/games/${p.gameCode}`} className="hover:text-orange-400">{p.home.clubCode} v {p.away.clubCode}</Link>
+                    <Link href={`/games/${p.gameCode}`} className="hover:text-orange-400">{clubAbbr(p.home.clubCode)} v {clubAbbr(p.away.clubCode)}</Link>
                   </td>
                   <td className="px-3 py-2 text-right tabular-nums text-neutral-300">
                     {pct(m.homePrice)}
@@ -724,7 +725,7 @@ export function PaperTradingPanel({ data }: { data: PredictionsOverview }) {
               {paper.games.map((g) => (
                 <tr key={g.gameCode} className="border-t border-neutral-800/60">
                   <td className="px-3 py-2">
-                    <Link href={`/games/${g.gameCode}`} className="hover:text-orange-400">{g.home.clubCode} v {g.away.clubCode}</Link>
+                    <Link href={`/games/${g.gameCode}`} className="hover:text-orange-400">{clubAbbr(g.home.clubCode)} v {clubAbbr(g.away.clubCode)}</Link>
                   </td>
                   <td className="px-3 py-2 text-right tabular-nums text-neutral-300" title={`Last price before tip-off, saved ${utcTime(g.pricedAt)} UTC`}>
                     {pct(g.marketHomePrice)}

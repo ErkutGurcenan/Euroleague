@@ -3,6 +3,7 @@ export const metadata = { title: "Prediction history" };
 import Link from "@/components/Link";
 import PredictionsToggle from "@/components/PredictionsToggle";
 import { getPredictionHistory, type GradedCall, type HistoryGame, type Tally } from "@/lib/api";
+import { clubAbbr } from "@/lib/clubs";
 import { currentSeason } from "@/lib/season";
 
 const MODELS = [
@@ -64,7 +65,7 @@ function CallCell({ c, g }: { c: GradedCall | null; g: HistoryGame }) {
       className={c.correct ? "text-emerald-400" : "text-red-400"}
       title={c.pickedWinner ? "Asked to pick the winner (Jev's question before 22 October)" : undefined}
     >
-      {team.clubCode} {pct(homeFav ? c.homeWinProb : 1 - c.homeWinProb)}
+      {clubAbbr(team.clubCode)} {pct(homeFav ? c.homeWinProb : 1 - c.homeWinProb)}
       {c.pickedWinner ? "*" : ""} {c.correct ? "✓" : "✗"}
     </span>
   );
@@ -136,7 +137,7 @@ export default async function PredictionHistoryPage() {
                     <tr key={g.gameCode} className="border-t border-neutral-800/60">
                       <td className="px-3 py-2">
                         <Link href={`/games/${g.gameCode}`} className="hover:text-orange-400">
-                          {g.home.clubCode} v {g.away.clubCode}
+                          {clubAbbr(g.home.clubCode)} v {clubAbbr(g.away.clubCode)}
                         </Link>
                       </td>
                       <td className="px-3 py-2 tabular-nums text-neutral-400">{g.result.homeScore}–{g.result.awayScore}</td>
