@@ -4,7 +4,7 @@
 # Usage: web/serve.sh            build, then restart
 #        web/serve.sh --no-build restart only (e.g. after a reboot)
 #
-# The server is stopped during the build (~40s on this box) so the build
+# The server is stopped during the build (~90s on this box) so the build
 # and the server don't compete for the instance's ~1 GB of RAM.
 set -euo pipefail
 
@@ -13,6 +13,13 @@ export PATH="$HOME/.local/node22/bin:/usr/sbin:$PATH"
 export NEXT_TELEMETRY_DISABLED=1
 LOG_DIR="$HOME/ingest-logs"
 mkdir -p "$LOG_DIR"
+
+# Type check first, while the old server still runs, so a type error stops
+# here instead of taking the site down. next build skips its own check
+# (next.config.ts): it needs more memory than this box has.
+if [[ "${1:-}" != "--no-build" ]]; then
+  NODE_OPTIONS=--max-old-space-size=700 npx tsc --noEmit -p .
+fi
 
 pid=$(ss -ltnpH 'sport = :3000' | grep -o 'pid=[0-9]*' | head -1 | cut -d= -f2 || true)
 if [[ -n "$pid" ]]; then
