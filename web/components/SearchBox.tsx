@@ -15,10 +15,7 @@ export default function SearchBox() {
   const boxRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (query.trim().length < 2) {
-      setResults(EMPTY);
-      return;
-    }
+    if (query.trim().length < 2) return; // the typing handler clears the results
     const controller = new AbortController();
     const t = setTimeout(async () => {
       try {
@@ -50,6 +47,7 @@ export default function SearchBox() {
   const go = (href: string) => {
     setOpen(false);
     setQuery("");
+    setResults(EMPTY);
     router.push(href);
   };
   const hasResults = results.clubs.length > 0 || results.players.length > 0;
@@ -60,7 +58,10 @@ export default function SearchBox() {
         type="search"
         value={query}
         placeholder="Search…"
-        onChange={(e) => setQuery(e.target.value)}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          if (e.target.value.trim().length < 2) setResults(EMPTY);
+        }}
         onFocus={() => query.trim().length >= 2 && setOpen(true)}
         onKeyDown={(e) => e.key === "Escape" && setOpen(false)}
         className="w-44 max-w-full rounded-md border border-neutral-700 bg-neutral-900 px-2.5 py-1.5 text-sm placeholder-neutral-500 outline-none transition-all focus:w-64 focus:border-orange-600 sm:w-56"
