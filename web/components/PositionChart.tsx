@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { StandingsHistoryClub } from "@/lib/api";
+import { clubAbbr } from "@/lib/clubs";
 
 const COLORS = [
   "#f97316", "#10b981", "#3b82f6", "#e879f9",
@@ -74,7 +75,7 @@ export default function PositionChart({
                   className="h-3.5 w-3.5 object-contain"
                 />
               )}
-              {c.club.code}
+              {clubAbbr(c.club.code)}
             </button>
           );
         })}

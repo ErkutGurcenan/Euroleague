@@ -1,5 +1,6 @@
 import Link from "@/components/Link";
 import type { OnOffRow, PlayerOnOffEntry } from "@/lib/api";
+import { clubAbbr } from "@/lib/clubs";
 
 export const ONOFF_NOTE =
   "On/off compares how the team did per 100 possessions with the player on the court and on the bench, in games he played. It depends on teammates and opponents: starters often face the other team's best players, and a strong bench lifts the off-court numbers.";
@@ -76,7 +77,7 @@ export function OnOffRanking({ data, limit }: { data: RankingData; limit?: numbe
                           // eslint-disable-next-line @next/next/no-img-element
                           <img src={p.clubCrest} alt="" className="h-4 w-4 object-contain" />
                         )}
-                        {p.clubCode}
+                        {clubAbbr(p.clubCode)}
                       </Link>
                     </td>
                   )}

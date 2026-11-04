@@ -1,5 +1,6 @@
 import Link from "@/components/Link";
 import type { HeadToHead } from "@/lib/api";
+import { clubAbbr } from "@/lib/clubs";
 
 function MeetingRow({
   m,
@@ -53,7 +54,7 @@ function Timeline({ h2h }: { h2h: HeadToHead }) {
           <Link
             key={m.gameCode}
             href={`/games/${m.gameCode}`}
-            title={`${m.seasonLabel} ${m.stage}: ${m.homeCode} ${m.homeScore}–${m.awayScore} ${m.awayCode}`}
+            title={`${m.seasonLabel} ${m.stage}: ${clubAbbr(m.homeCode)} ${m.homeScore}–${m.awayScore} ${clubAbbr(m.awayCode)}`}
             className={`h-3.5 w-3.5 rounded-full ${
               m.winner === h2h.clubA.code ? "bg-orange-500" : "bg-neutral-600"
             } hover:ring-2 hover:ring-white/40`}

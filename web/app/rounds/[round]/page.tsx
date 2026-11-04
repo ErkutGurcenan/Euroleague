@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "@/components/Link";
 import { PredictionCard } from "@/components/Predictions";
 import { getRoundPreview, type PreviewGame, type PreviewTeam } from "@/lib/api";
+import { clubAbbr } from "@/lib/clubs";
 import { currentSeason } from "@/lib/season";
 
 export async function generateMetadata({ params }: { params: Promise<{ round: string }> }) {
@@ -62,11 +63,11 @@ function Team({ t, right = false }: { t: PreviewTeam; right?: boolean }) {
     <div className={`flex min-w-0 items-center gap-2 ${right ? "flex-row-reverse text-right" : ""}`}>
       {t.clubCrest && (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={t.clubCrest} alt="" className="h-9 w-9 shrink-0 object-contain" />
+        <img src={t.clubCrest} alt="" className="h-7 w-7 shrink-0 object-contain sm:h-9 sm:w-9" />
       )}
       <div className="grid min-w-0 gap-0.5">
-        <Link href={`/teams/${t.clubCode}`} className="truncate font-semibold hover:text-orange-400">
-          {t.clubName}
+        <Link href={`/teams/${t.clubCode}`} className="text-sm font-semibold leading-tight hover:text-orange-400 sm:truncate sm:text-base" title={t.clubName}>
+          {t.shortName}
         </Link>
         <span className="text-xs text-neutral-400">
           {t.position ? `${ordinal(t.position)} · ` : ""}
@@ -87,7 +88,7 @@ function Team({ t, right = false }: { t: PreviewTeam; right?: boolean }) {
 function OutList({ t }: { t: PreviewTeam }) {
   return (
     <div className="text-xs">
-      <span className="font-semibold text-neutral-300">{t.clubCode} out or doubtful: </span>
+      <span className="font-semibold text-neutral-300">{clubAbbr(t.clubCode)} out or doubtful: </span>
       {t.out.length === 0 ? (
         <span className="text-neutral-500">none reported</span>
       ) : (
@@ -137,12 +138,12 @@ function GameCard({ g }: { g: PreviewGame }) {
           "First meeting since 2016-17."
         ) : (
           <>
-            {`Earlier meetings since 2016-17: ${g.home.clubCode} ${h2h.homeWins}–${h2h.awayWins} ${g.away.clubCode}`}
+            {`Earlier meetings since 2016-17: ${clubAbbr(g.home.clubCode)} ${h2h.homeWins}–${h2h.awayWins} ${clubAbbr(g.away.clubCode)}`}
             {h2h.last && (
               <>
                 {" · last: "}
                 <Link href={`/games/${h2h.last.gameCode}`} className="hover:text-orange-400">
-                  {`${h2h.last.seasonLabel}, ${h2h.last.home} ${h2h.last.homeScore}–${h2h.last.awayScore} ${h2h.last.away}`}
+                  {`${h2h.last.seasonLabel}, ${clubAbbr(h2h.last.home)} ${h2h.last.homeScore}–${h2h.last.awayScore} ${clubAbbr(h2h.last.away)}`}
                 </Link>
               </>
             )}
@@ -162,14 +163,14 @@ function Glance({ games }: { games: PreviewGame[] }) {
   const favourite = [...pool].sort((a, b) => spread(b) - spread(a))[0];
   const fav = (g: PreviewGame) => {
     const p = g.prediction!.homeWinProb;
-    return p >= 0.5 ? `${g.home.clubCode} ${pct(p)}` : `${g.away.clubCode} ${pct(1 - p)}`;
+    return p >= 0.5 ? `${clubAbbr(g.home.clubCode)} ${pct(p)}` : `${clubAbbr(g.away.clubCode)} ${pct(1 - p)}`;
   };
   const splits = called.flatMap((g) => {
     const k = picks(g);
     const notes: string[] = [];
-    if (k.jev && k.ours && k.jev.clubCode !== k.ours.clubCode) notes.push(`Jev picks ${k.jev.clubCode}`);
-    if (k.market && k.ours && k.market.clubCode !== k.ours.clubCode) notes.push(`the market favours ${k.market.clubCode}`);
-    return notes.length ? [{ g, text: `${g.home.clubCode} v ${g.away.clubCode}: we pick ${k.ours?.clubCode}, ${notes.join(" and ")}` }] : [];
+    if (k.jev && k.ours && k.jev.clubCode !== k.ours.clubCode) notes.push(`Jev picks ${clubAbbr(k.jev.clubCode)}`);
+    if (k.market && k.ours && k.market.clubCode !== k.ours.clubCode) notes.push(`the market favours ${clubAbbr(k.market.clubCode)}`);
+    return notes.length ? [{ g, text: `${clubAbbr(g.home.clubCode)} v ${clubAbbr(g.away.clubCode)}: we pick ${clubAbbr(k.ours?.clubCode)}, ${notes.join(" and ")}` }] : [];
   });
   const graded = called.filter((g) => g.played);
   const record = (who: "ours" | "jev" | "market") => {
@@ -199,14 +200,14 @@ function Glance({ games }: { games: PreviewGame[] }) {
         {closest && (
           <div className="rounded-lg border border-neutral-800 bg-neutral-900/40 px-4 py-3">
             <div className="text-xs uppercase text-neutral-500">Closest game</div>
-            <div className="font-semibold">{closest.home.clubCode} v {closest.away.clubCode}</div>
+            <div className="font-semibold">{clubAbbr(closest.home.clubCode)} v {clubAbbr(closest.away.clubCode)}</div>
             <div className="text-xs text-neutral-400">{fav(closest)}</div>
           </div>
         )}
         {favourite && (
           <div className="rounded-lg border border-neutral-800 bg-neutral-900/40 px-4 py-3">
             <div className="text-xs uppercase text-neutral-500">Biggest favourite</div>
-            <div className="font-semibold">{favourite.home.clubCode} v {favourite.away.clubCode}</div>
+            <div className="font-semibold">{clubAbbr(favourite.home.clubCode)} v {clubAbbr(favourite.away.clubCode)}</div>
             <div className="text-xs text-neutral-400">{fav(favourite)}</div>
           </div>
         )}

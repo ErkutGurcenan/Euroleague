@@ -13,6 +13,7 @@ import {
   type Game,
   type PlayerSummary,
 } from "@/lib/api";
+import { clubAbbr } from "@/lib/clubs";
 import { currentSeason, seasonLabel } from "@/lib/season";
 
 const AWARD_ICONS: Record<string, string> = {
@@ -41,7 +42,7 @@ function LeaderRow({
       >
         {player.name}
       </Link>
-      <span className="text-xs text-neutral-500">{player.club?.code}</span>
+      <span className="text-xs text-neutral-500">{clubAbbr(player.club?.code)}</span>
       <span className="w-10 text-right font-semibold tabular-nums">
         {value.toFixed(1)}
       </span>

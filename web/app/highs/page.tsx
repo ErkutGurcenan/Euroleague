@@ -2,6 +2,7 @@ export const metadata = { title: "Season highs" };
 
 import Link from "@/components/Link";
 import { getHighs } from "@/lib/api";
+import { clubAbbr } from "@/lib/clubs";
 import { currentSeason } from "@/lib/season";
 
 export default async function HighsPage() {
@@ -44,7 +45,7 @@ export default async function HighsPage() {
                       href={`/games/${e.gameCode}`}
                       className="ml-1.5 text-xs text-neutral-500 hover:text-orange-400"
                     >
-                      {e.clubCode} vs {e.opponent} · R{e.round}
+                      {clubAbbr(e.clubCode)} vs {e.opponent} · R{e.round}
                     </Link>
                   </span>
                   <span className="text-base font-bold tabular-nums">

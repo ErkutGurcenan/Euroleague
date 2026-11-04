@@ -3,6 +3,7 @@
 import Link from "@/components/Link";
 import { useState } from "react";
 import type { ClubLineups, LineupRow } from "@/lib/api";
+import { clubAbbr } from "@/lib/clubs";
 
 type LineupsData = {
   games: number;
@@ -102,7 +103,7 @@ export default function LineupsPanel({ data }: { data: LineupsData }) {
                           // eslint-disable-next-line @next/next/no-img-element
                           <img src={r.clubCrest} alt="" className="h-4 w-4 object-contain" />
                         )}
-                        {r.clubCode}
+                        {clubAbbr(r.clubCode)}
                       </Link>
                     )}
                     {r.players.map((p, i) => (

@@ -6,8 +6,10 @@ Usage:
 Run every minute by cron. Most runs find no game on and exit at once. While a
 game is on (from 10 minutes before tip-off until it is over), the run reads
 each game's header from the official live feed twice, 30 seconds apart, and
-saves score, quarter, clock and the score after each period in live_games.
-The site reads that table, never the feed, so visitors add no load on it.
+saves score, quarter, clock and the score after each period in live_games,
+plus the live box score and the win probability (winprob.py, starting from
+our pre-game call) in live_details. The site reads those tables, never the
+feed, so visitors add no load on it.
 
 When the feed shows a game over but our database doesn't have it as played,
 the run starts the importer (ingest + ingest_details for the season) under
@@ -33,11 +35,13 @@ from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import Session
 
 from .ingest import DEFAULT_DB
-from .models import Base, Game, LiveGame
+from .models import Base, Game, GamePrediction, LiveDetail, LiveGame
+from .winprob import elapsed, home_win_prob
 
 log = logging.getLogger("live")
 
 HEADER = "https://live.euroleague.net/api/Header"
+BOXSCORE = "https://live.euroleague.net/api/Boxscore"
 POLL_EVERY = 30  # seconds between the two reads of a run
 BEFORE = timedelta(minutes=10)  # start reading this long before tip-off
 AFTER = timedelta(hours=4)  # stop reading this long after tip-off
@@ -90,6 +94,57 @@ def parse(d: dict, g: Game, now: datetime) -> dict:
     }
 
 
+def box_side(players: list[dict]) -> list[dict]:
+    """The live box score's players, compact; DNP players last."""
+    rows = [{
+        "name": p.get("Player"), "no": p.get("Dorsal"), "min": p.get("Minutes"),
+        "pts": num(p.get("Points")), "reb": num(p.get("TotalRebounds")), "ast": num(p.get("Assistances")),
+        "pir": num(p.get("Valuation")), "on": bool(p.get("IsPlaying")), "starter": bool(p.get("IsStarter")),
+    } for p in players]
+    return sorted(rows, key=lambda r: (not r["min"] or r["min"] == "DNP", -minutes(r["min"])))
+
+
+def fetch_box(season: str, g: Game) -> dict | None:
+    r = requests.get(BOXSCORE, params={"gamecode": g.game_code, "seasoncode": season}, timeout=15)
+    r.raise_for_status()
+    teams = r.json().get("Stats") or []
+    out = {}
+    for t in teams:
+        players = t.get("PlayersStats") or []
+        code = next((p.get("Team") for p in players if p.get("Team")), None)
+        side = "home" if code == g.local_club_code else "away" if code == g.road_club_code else None
+        if side:
+            out[side] = {"code": code, "players": box_side(players)}
+    return out if len(out) == 2 else None
+
+
+def update_detail(session: Session, season: str, g: Game, row: LiveGame, p0: float, now: datetime) -> None:
+    """Live box score and one more win-probability point for a game under way."""
+    detail = session.execute(
+        select(LiveDetail).where(LiveDetail.season_code == season, LiveDetail.game_code == g.game_code)
+    ).scalar()
+    if detail is None:
+        detail = LiveDetail(season_code=season, game_code=g.game_code, updated_at=now)
+        session.add(detail)
+    try:
+        box = fetch_box(season, g)
+        if box:
+            detail.boxscore = json.dumps(box)
+    except (requests.RequestException, ValueError) as exc:
+        log.warning("game %s: live box score unavailable: %s", g.game_code, exc)
+    quarter = int(row.quarter) if (row.quarter or "").isdigit() else 1
+    clock = minutes(row.clock) if row.clock else 10.0
+    margin = (row.home_score or 0) - (row.away_score or 0)
+    final = row.status == "final"
+    played = 40.0 + max(0, quarter - 4) * 5 if final else elapsed(quarter, clock)
+    point = [round(played, 2), round(home_win_prob(margin, quarter, clock, p0, final), 4)]
+    points = json.loads(detail.win_probs) if detail.win_probs else [[0.0, round(p0, 4)]]
+    if point[0] >= points[-1][0] and point != points[-1]:
+        points.append(point)
+    detail.win_probs = json.dumps(points)
+    detail.updated_at = now
+
+
 def due(session: Session, season: str, now: datetime) -> list[Game]:
     """Games on now: tip-off between 4 hours ago and 10 minutes from now,
     not yet in our database as played."""
@@ -102,6 +157,9 @@ def due(session: Session, season: str, now: datetime) -> list[Game]:
 
 def poll(session: Session, season: str, games: list[Game]) -> list[LiveGame]:
     now = datetime.utcnow()
+    calls = {p.game_code: p.home_win_prob for p in session.execute(
+        select(GamePrediction).where(GamePrediction.season_code == season, GamePrediction.backtest.is_(False),
+                                     GamePrediction.game_code.in_([g.game_code for g in games]))).scalars()}
     rows = []
     for g in games:
         try:
@@ -125,6 +183,11 @@ def poll(session: Session, season: str, games: list[Game]) -> list[LiveGame]:
         row.updated_at = now
         if row.status == "final" and row.final_at is None:
             row.final_at = now
+        if row.status != "scheduled":
+            try:  # the extras must never stop the live score itself
+                update_detail(session, season, g, row, calls.get(g.game_code, 0.5), now)
+            except Exception as exc:  # noqa: BLE001
+                log.warning("game %s: live extras failed: %s", g.game_code, exc)
         rows.append(row)
     session.commit()
     return rows
