@@ -214,6 +214,14 @@ export default async function GamesPage({
             </div>
           </Link>
         )}
+        {round && (
+          <Link
+            href={`/rounds/${round}`}
+            className="mb-3 inline-block text-sm text-orange-400 hover:underline"
+          >
+            {games.every((g) => g.played) ? `Round ${round} review: predictions vs results →` : `Round ${round} preview: predictions, injuries, head-to-head →`}
+          </Link>
+        )}
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {games.map((g) => (
             <GameCard key={g.id} game={g} />

@@ -86,7 +86,7 @@ function favouriteOf(homeProb: number, p: Prediction): { team: ClubBadge; prob: 
 }
 
 /** Jev's call for the same game, graded after the game. */
-function AiLine({ p }: { p: Prediction }) {
+function AiLine({ p, compact = false }: { p: Prediction; compact?: boolean }) {
   if (!p.ai) return null;
   const ai = favouriteOf(p.ai.homeWinProb, p);
   const ours = favouriteOf(p.homeWinProb, p);
@@ -102,9 +102,11 @@ function AiLine({ p }: { p: Prediction }) {
       ) : (
         disagree && <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-xs text-amber-300">disagrees with us</span>
       )}
-      <span className="w-full text-xs text-neutral-500">
-        TypeSafe&apos;s Jev, given the same kind of facts (records, form, ratings, efficiency, home court) but not our prediction.
-      </span>
+      {!compact && (
+        <span className="w-full text-xs text-neutral-500">
+          TypeSafe&apos;s Jev, given the same kind of facts (records, form, ratings, efficiency, home court) but not our prediction.
+        </span>
+      )}
     </div>
   );
 }
@@ -142,7 +144,7 @@ function MarketLine({ p }: { p: Prediction }) {
 }
 
 /** Match page: the model's call, or for finished games the pre-game call graded. */
-export function PredictionCard({ p }: { p: Prediction }) {
+export function PredictionCard({ p, compact = false }: { p: Prediction; compact?: boolean }) {
   const favourite = p.homeWinProb >= 0.5 ? p.home : p.away;
   const favProb = Math.max(p.homeWinProb, 1 - p.homeWinProb);
   return (
@@ -170,13 +172,13 @@ export function PredictionCard({ p }: { p: Prediction }) {
           </span>
         ))}
       </div>
-      {p.ai && (!p.result || p.ai.preGame) && <AiLine p={p} />}
+      {p.ai && (!p.result || p.ai.preGame) && <AiLine p={p} compact={compact} />}
       <MarketLine p={p} />
-      <p className="text-xs text-neutral-500">
+      {!compact && <p className="text-xs text-neutral-500">
         Ratings alone give {p.home.clubCode} {pct(p.eloHomeProb)}. The call combines power ratings,
         season efficiency and home court, is updated every night and is locked at tip-off.{" "}
         <Link href="/predictions" className="text-orange-400 hover:underline">Track record →</Link>
-      </p>
+      </p>}
     </div>
   );
 }
