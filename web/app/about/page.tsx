@@ -159,8 +159,7 @@ export default async function AboutPage() {
 
       <Section title="What's next">
         <ul className="list-disc space-y-2 pl-5 text-neutral-300">
-          <li>Lineup analysis: which five-player combinations work best, from play-by-play data.</li>
-          <li>Game predictions, built and backtested on every season in the database.</li>
+          <li>A guide that explains every number on the site in plain words.</li>
         </ul>
       </Section>
 
