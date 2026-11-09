@@ -26,7 +26,7 @@ export const metadata: Metadata = {
     template: "%s · Eurostepper",
   },
   description:
-    "EuroLeague standings, results, shot charts, rosters and stats — Eurostepper",
+    "EuroLeague live scores, standings, results, game predictions, shot charts, rosters and stats — Eurostepper",
 };
 
 export default async function RootLayout({
