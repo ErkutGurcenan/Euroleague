@@ -36,6 +36,7 @@ export const NAV: NavItem[] = [
     ],
   },
   { href: "/compare", label: "Compare" },
+  { href: "/guide", label: "Guide" },
 ];
 
 /** Extra paths that belong to a top-level link (tabs living at their own URL). */
