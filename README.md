@@ -1,7 +1,8 @@
 # Euroleague Stats
 
-A Euroleague basketball web application: standings, fixtures, team & player stats,
-rosters — with derived analytics and game predictions planned.
+A Euroleague basketball web application: standings, live scores, box scores, shot
+charts, team & player stats and rosters, plus derived analytics (power ratings,
+lineups, player impact) and game predictions graded against Polymarket.
 
 ## Architecture
 
@@ -35,6 +36,9 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 # Injury list, read automatically from BasketballSphere (the API has no injuries;
 # cron at 10:00, 14:00 and 17:00 UK time; see pipeline/INJURY_UPDATES.md):
 .venv/bin/python -m euroleague_pipeline.injury_feed
+# Live scores on game nights, and results minutes after the final buzzer
+# (cron every minute; most runs find no game on and exit at once):
+.venv/bin/python -m euroleague_pipeline.live
 
 # 2. Run the API (http://localhost:8000)
 cd ../api
