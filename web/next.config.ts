@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Types are checked with `tsc --noEmit` before each build: the check inside
+  // `next build` needs over 1 GB of memory, more than this server has.
+  typescript: { ignoreBuildErrors: true },
   images: {
     // Player headshots from the EuroLeague media CDNs (750x1000 PNGs, ~550 KB).
     remotePatterns: [
