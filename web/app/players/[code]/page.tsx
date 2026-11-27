@@ -6,6 +6,7 @@ import { PlayerAdjusted } from "@/components/AdjustedImpact";
 import { PlayerImpact } from "@/components/OnOff";
 import PlayerViewToggle from "@/components/PlayerViewToggle";
 import ShotChartExplorer from "@/components/ShotChartExplorer";
+import Term from "@/components/Term";
 import { getPlayer, getPlayerImpact, getPlayerOnOff, getPlayerShots } from "@/lib/api";
 import { currentSeason } from "@/lib/season";
 
@@ -171,8 +172,8 @@ export default async function PlayerPage({
               <th className="px-2 py-2 text-right">2P</th>
               <th className="px-2 py-2 text-right">3P</th>
               <th className="px-2 py-2 text-right">FT</th>
-              <th className="px-2 py-2 text-right">PIR</th>
-              <th className="px-2 py-2 text-right">+/−</th>
+              <th className="px-2 py-2 text-right"><Term id="pir">PIR</Term></th>
+              <th className="px-2 py-2 text-right"><Term id="plus-minus">+/−</Term></th>
             </tr>
           </thead>
           <tbody>

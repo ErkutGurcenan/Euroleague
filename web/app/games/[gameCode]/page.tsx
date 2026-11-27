@@ -7,6 +7,7 @@ import { appliesToRound, isUnavailable, noteAndTimeline, StatusPill } from "@/co
 import { PredictionCard } from "@/components/Predictions";
 import RotationChart from "@/components/RotationChart";
 import ShotChart from "@/components/ShotChart";
+import Term from "@/components/Term";
 import { getGame, getGamePrediction, getHeadToHead, getInjuries, getLive, getRotation, type GameDetailSide } from "@/lib/api";
 import { currentSeason } from "@/lib/season";
 
@@ -34,10 +35,10 @@ function BoxScoreTable({ side }: { side: GameDetailSide }) {
               <th className="px-2 py-2 text-right">Reb</th>
               <th className="px-2 py-2 text-right">Ast</th>
               <th className="px-2 py-2 text-right">Stl</th>
-              <th className="px-2 py-2 text-right">To</th>
+              <th className="px-2 py-2 text-right"><Term id="to">To</Term></th>
               <th className="px-2 py-2 text-right">Blk</th>
-              <th className="px-2 py-2 text-right">PIR</th>
-              <th className="px-2 py-2 text-right">+/−</th>
+              <th className="px-2 py-2 text-right"><Term id="pir">PIR</Term></th>
+              <th className="px-2 py-2 text-right"><Term id="plus-minus">+/−</Term></th>
             </tr>
           </thead>
           <tbody>

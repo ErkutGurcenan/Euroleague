@@ -1,4 +1,5 @@
 import Link from "@/components/Link";
+import Term from "@/components/Term";
 import type { OnOffRow, PlayerOnOffEntry } from "@/lib/api";
 import { clubAbbr } from "@/lib/clubs";
 
@@ -44,9 +45,9 @@ export function OnOffRanking({ data, limit }: { data: RankingData; limit?: numbe
               <th className="px-3 py-2">Player</th>
               {league && <th className="px-3 py-2">Team</th>}
               <th className="px-2 py-2 text-right">On min</th>
-              <th className="px-2 py-2 text-right">Net on</th>
-              <th className="px-2 py-2 text-right">Net off</th>
-              <th className="px-3 py-2">Swing</th>
+              <th className="px-2 py-2 text-right"><Term id="net-rating">Net on</Term></th>
+              <th className="px-2 py-2 text-right"><Term id="net-rating">Net off</Term></th>
+              <th className="px-3 py-2"><Term id="swing">Swing</Term></th>
             </tr>
           </thead>
           <tbody>
@@ -111,7 +112,7 @@ export function OnOffRanking({ data, limit }: { data: RankingData; limit?: numbe
   );
 }
 
-function Tile({ label, value, sub, highlight }: { label: string; value: string; sub: string; highlight?: boolean }) {
+function Tile({ label, value, sub, highlight }: { label: React.ReactNode; value: string; sub: string; highlight?: boolean }) {
   return (
     <div className={`rounded-lg border bg-neutral-900/40 px-4 py-3 text-center ${highlight ? "border-orange-600/60" : "border-neutral-800"}`}>
       <div className="text-xs uppercase text-neutral-500">{label}</div>
@@ -139,7 +140,7 @@ export function PlayerImpact({ entries }: { entries: PlayerOnOffEntry[] }) {
           <div className="grid max-w-2xl grid-cols-3 gap-3">
             <Tile label="On court" value={signed(e.on.netRating)} sub={`${e.on.minutes.toFixed(0)} min`} />
             <Tile label="Off court" value={signed(e.off.netRating)} sub={`${e.off.minutes.toFixed(0)} min`} />
-            <Tile label="Swing" value={signed(e.swing)} sub={e.rank ? `${ordinal(e.rank)} of ${e.qualifiedPlayers} on team` : "not ranked yet"} highlight />
+            <Tile label={<Term id="swing">Swing</Term>} value={signed(e.swing)} sub={e.rank ? `${ordinal(e.rank)} of ${e.qualifiedPlayers} on team` : "not ranked yet"} highlight />
           </div>
           <p className="max-w-2xl text-sm text-neutral-400">
             {e.swing === null

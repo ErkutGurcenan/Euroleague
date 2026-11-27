@@ -1,4 +1,5 @@
 import Link from "@/components/Link";
+import Term from "@/components/Term";
 import type { AdjustedImpact, PlayerImpactData } from "@/lib/api";
 import { clubAbbr } from "@/lib/clubs";
 
@@ -53,7 +54,7 @@ export function AdjustedLeaderboard({ data, limit = 50 }: { data: AdjustedImpact
               <th className="px-2 py-2 text-right">Min</th>
               <th className="px-2 py-2 text-right">Offence</th>
               <th className="px-2 py-2 text-right">Defence</th>
-              <th className="px-2 py-2 text-right">Total</th>
+              <th className="px-2 py-2 text-right"><Term id="adjusted-impact">Total</Term></th>
               <th className="px-3 py-2">Range</th>
             </tr>
           </thead>
@@ -104,7 +105,7 @@ export function AdjustedLeaderboard({ data, limit = 50 }: { data: AdjustedImpact
   );
 }
 
-function Tile({ label, value, sub, highlight }: { label: string; value: string; sub: string; highlight?: boolean }) {
+function Tile({ label, value, sub, highlight }: { label: React.ReactNode; value: string; sub: string; highlight?: boolean }) {
   return (
     <div className={`rounded-lg border bg-neutral-900/40 px-4 py-3 text-center ${highlight ? "border-orange-600/60" : "border-neutral-800"}`}>
       <div className="text-xs uppercase text-neutral-500">{label}</div>
@@ -122,7 +123,7 @@ export function PlayerAdjusted({ data }: { data: PlayerImpactData }) {
         <>
           <div className="grid max-w-2xl grid-cols-3 gap-3">
             <Tile
-              label="Adjusted impact"
+              label={<Term id="adjusted-impact">Adjusted impact</Term>}
               value={signed(c.total)}
               sub={c.rank ? `${ordinal(c.rank)} of ${c.qualified} in the league` : `needs ${c.minMinutes}+ min to rank`}
               highlight
