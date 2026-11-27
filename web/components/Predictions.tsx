@@ -283,37 +283,6 @@ export function TrackRecord({ data }: { data: PredictionsOverview }) {
       <Link href="/predictions/history" className="justify-self-start text-sm text-orange-400 hover:underline">
         Full prediction history, with Jev and Polymarket →
       </Link>
-      <div className="overflow-x-auto rounded-lg border border-neutral-800">
-        <table className="w-full whitespace-nowrap text-sm">
-          <thead className="bg-neutral-900 text-left text-xs uppercase text-neutral-400">
-            <tr>
-              <th className="px-3 py-2">Game</th>
-              <th className="px-3 py-2">Call</th>
-              <th className="px-3 py-2">Result</th>
-              <th className="px-3 py-2" />
-            </tr>
-          </thead>
-          <tbody>
-            {data.recent.map((p) => {
-              const fav = p.homeWinProb >= 0.5 ? p.home : p.away;
-              return (
-                <tr key={p.gameCode} className="border-t border-neutral-800/60">
-                  <td className="px-3 py-2">
-                    <Link href={`/games/${p.gameCode}`} className="hover:text-orange-400">
-                      {clubAbbr(p.home.clubCode)} v {clubAbbr(p.away.clubCode)}
-                    </Link>
-                  </td>
-                  <td className="px-3 py-2 text-neutral-300">{clubAbbr(fav.clubCode)} {pct(Math.max(p.homeWinProb, 1 - p.homeWinProb))}</td>
-                  <td className="px-3 py-2 tabular-nums text-neutral-400">{p.result?.homeScore}–{p.result?.awayScore}</td>
-                  <td className="px-3 py-2">
-                    <span className={p.result?.correct ? "text-emerald-400" : "text-red-400"}>{p.result?.correct ? "✓" : "✗"}</span>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
     </div>
   );
 }
