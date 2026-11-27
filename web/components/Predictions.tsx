@@ -385,82 +385,6 @@ export function BacktestPanel({ data }: { data: PredictionsOverview }) {
   );
 }
 
-export function ChallengerPanel({ data }: { data: PredictionsOverview }) {
-  const c = data.challenger;
-  const card = (label: string, sc: typeof c.ours, highlight: boolean) => (
-    <div className={`rounded-lg border bg-neutral-900/40 px-4 py-3 ${highlight ? "border-orange-600/60" : "border-neutral-800"}`}>
-      <div className="text-xs uppercase text-neutral-500">{label}</div>
-      <div className="text-2xl font-bold tabular-nums">
-        {sc.games ? `${sc.correct}–${sc.games - (sc.correct ?? 0)}` : "–"}
-      </div>
-      <div className="text-xs text-neutral-500">
-        {sc.games ? `${pct(sc.accuracy ?? 0)} correct · log loss ${(sc.logLoss ?? 0).toFixed(3)} · Brier ${(sc.brier ?? 0).toFixed(3)}` : "no graded games yet"}
-      </div>
-    </div>
-  );
-  const oursBetter = c.games > 0 && (c.ours.logLoss ?? 9) < (c.ai.logLoss ?? 9);
-  return (
-    <div className="grid gap-3">
-      <div className="grid gap-3 sm:grid-cols-2">
-        {card("Eurostepper model", c.ours, oursBetter)}
-        {card(c.provider, c.ai, c.games > 0 && !oursBetter)}
-      </div>
-      {c.games === 0 ? (
-        <p className="text-sm text-neutral-400">
-          Both models have called every game of the next round ({`${c.upcomingCalls} games`}), before tip-off.
-          The scores start filling in after Round 7&apos;s first games are played.
-        </p>
-      ) : (
-        <div className="overflow-x-auto rounded-lg border border-neutral-800">
-          <table className="w-full whitespace-nowrap text-sm">
-            <thead className="bg-neutral-900 text-left text-xs uppercase text-neutral-400">
-              <tr>
-                <th className="px-3 py-2">Game</th>
-                <th className="px-3 py-2">Result</th>
-                <th className="px-3 py-2">Eurostepper</th>
-                <th className="px-3 py-2">Jev</th>
-              </tr>
-            </thead>
-            <tbody>
-              {c.recent.map((p) => {
-                const homeWon = (p.result?.homeScore ?? 0) > (p.result?.awayScore ?? 0);
-                const call = (prob: number) => {
-                  const f = favouriteOf(prob, p);
-                  const right = (prob >= 0.5) === homeWon;
-                  return (
-                    <span className={right ? "text-emerald-400" : "text-red-400"}>
-                      {clubAbbr(f.team.clubCode)} {pct(f.prob)} {right ? "✓" : "✗"}
-                    </span>
-                  );
-                };
-                return (
-                  <tr key={p.gameCode} className="border-t border-neutral-800/60">
-                    <td className="px-3 py-2">
-                      <Link href={`/games/${p.gameCode}`} className="hover:text-orange-400">{clubAbbr(p.home.clubCode)} v {clubAbbr(p.away.clubCode)}</Link>
-                    </td>
-                    <td className="px-3 py-2 tabular-nums text-neutral-400">{p.result?.homeScore}–{p.result?.awayScore}</td>
-                    <td className="px-3 py-2 tabular-nums">{call(p.homeWinProb)}</td>
-                    <td className="px-3 py-2 tabular-nums">{p.ai ? call(p.ai.homeWinProb) : "–"}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-      <p className="text-xs text-neutral-500">
-        Jev is TypeSafe&apos;s decision model. Before each game it gets the same kind of facts our model
-        uses (records, last five results, power ratings, season efficiency, home court) but never our
-        prediction, and answers “Will the home team win?” with a probability. Until 22 October it was
-        asked to pick the winner instead, which gave near-certain answers such as 100%; one graded game,
-        Hapoel Tel Aviv v Virtus Bologna, used that version. Only calls made before tip-off count. Log
-        loss and Brier score reward well-judged probabilities (lower is better); probabilities are capped
-        at 1% and 99% for log loss so one certain miss can&apos;t dominate.
-      </p>
-    </div>
-  );
-}
-
 function againstMarket(name: string, x: { games: number; right: number }, total: number): string {
   if (x.games === 0) return `${name} hasn't picked a different winner from the market yet.`;
   return `${name} picked a different winner from the market in ${x.games} of ${plural(total, "game")} `
@@ -501,8 +425,10 @@ export function MarketPanel({ data }: { data: PredictionsOverview }) {
         </p>
       )}
       <p className="text-xs text-neutral-500">
-        Polymarket is a prediction market where a share in the winning team pays $1, so a price of 77¢
-        means traders give that team about a 77% chance. Each game is graded at the last price saved
+        Jev AI is TypeSafe&apos;s decision model: before each game it gets the same kind of facts as ours,
+        but never our prediction. Polymarket is a prediction market where a share in the winning team
+        pays $1, so a price of 77¢ means traders give that team about a 77% chance. Each game is graded
+        at the last price saved
         before tip-off (midway between the bid and the ask), on the same games for all three. The market
         already prices in what bettors know, injuries included, so matching its log loss is hard and
         beating it is the real test.
