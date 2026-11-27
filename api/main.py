@@ -1188,6 +1188,7 @@ def predictions_overview(season: str = DEFAULT_SEASON) -> dict:
 
     record = score([(d["homeWinProb"], d["result"]["homeScore"] > d["result"]["awayScore"]) for d in graded])
     elo_record = score([(d["eloHomeProb"], d["result"]["homeScore"] > d["result"]["awayScore"]) for d in graded])
+    trend = season_trend(graded, games, ai_calls, prices, score)
 
     by_season: dict[str, list] = {}
     model_items, elo_items, home_items = [], [], []
@@ -1215,6 +1216,7 @@ def predictions_overview(season: str = DEFAULT_SEASON) -> dict:
         "upcomingRoundNumber": round_number,
         "record": record,
         "eloRecord": elo_record,
+        "trend": trend,
         "recent": graded[:40],
         "challenger": challenger,
         "market": market,
@@ -1229,6 +1231,41 @@ def predictions_overview(season: str = DEFAULT_SEASON) -> dict:
             "calibration": calibration,
         },
     }
+
+
+def season_trend(graded: list[dict], games: dict, ai_calls: dict, prices: dict[int, MarketSnapshot], score) -> list[dict]:
+    """The track record after each round so far: our record and log loss and the
+    ratings-only record (counted like the season totals), and Jev's and the market
+    favourite's share of winners picked (counted like the history page)."""
+    by_round: dict[int, list[dict]] = {}
+    names: dict[int, Optional[str]] = {}
+    for d in graded:
+        g = games[(d["season"], d["gameCode"])]
+        by_round.setdefault(g.round or 0, []).append(d)
+        names[g.round or 0] = g.round_name
+
+    def share_right(calls: list[dict]) -> Optional[float]:
+        marks = [c["correct"] for c in calls if c["correct"] is not None]
+        return round(sum(marks) / len(marks), 4) if marks else None
+
+    trend, so_far = [], []
+    for rnd in sorted(by_round):
+        so_far += by_round[rnd]
+        won = [(d, d["result"]["homeScore"] > d["result"]["awayScore"]) for d in so_far]
+        ours = score([(d["homeWinProb"], w) for d, w in won])
+        jev = []
+        for d, w in won:
+            a = ai_calls.get((d["season"], d["gameCode"]))
+            if a is not None and a.utc_date and a.made_at < a.utc_date:
+                jev.append(graded_call(a.home_win_prob, w))
+        market = [graded_call(prices[d["gameCode"]].home_price, w) for d, w in won if d["gameCode"] in prices]
+        trend.append({
+            "round": rnd, "roundName": names[rnd], "games": len(so_far),
+            "accuracy": ours["accuracy"], "logLoss": ours["logLoss"],
+            "eloAccuracy": score([(d["eloHomeProb"], w) for d, w in won])["accuracy"],
+            "jevAccuracy": share_right(jev), "marketAccuracy": share_right(market),
+        })
+    return trend
 
 
 def market_overview(graded: list[dict], ai_calls: dict, prices: dict[int, MarketSnapshot],

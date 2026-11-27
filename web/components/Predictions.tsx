@@ -1,4 +1,5 @@
 import Link from "@/components/Link";
+import SeasonChart from "@/components/SeasonChart";
 import Term from "@/components/Term";
 import type { ClubBadge, PaperGame, PaperTrade, Prediction, PredictionsOverview, StrategySummary } from "@/lib/api";
 import { clubAbbr } from "@/lib/clubs";
@@ -253,12 +254,45 @@ export function UpcomingList({ items }: { items: Prediction[] }) {
   );
 }
 
-function Stat({ label, value, sub }: { label: React.ReactNode; value: string; sub: string }) {
+type Change = { text: string; good: boolean | null };
+
+/** A trend with no axes, just its shape, ending in a dot at the latest value.
+    The line stretches to the card's width; the dot stays round. */
+function Sparkline({ values }: { values: number[] }) {
+  const lo = Math.min(...values);
+  const span = Math.max(...values) - lo || 1;
+  const x = (i: number) => (i / (values.length - 1)) * 100;
+  const y = (v: number) => 10 + (1 - (v - lo) / span) * 80;
+  return (
+    <div className="relative mr-1 mt-2 h-8" aria-hidden="true">
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 h-full w-full overflow-visible">
+        <polyline
+          points={values.map((v, i) => `${x(i).toFixed(2)},${y(v).toFixed(2)}`).join(" ")}
+          fill="none" stroke="#737373" strokeWidth="1.5" strokeLinejoin="round" vectorEffect="non-scaling-stroke"
+        />
+      </svg>
+      <span
+        className="absolute h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-orange-400 ring-2 ring-neutral-950"
+        style={{ left: "100%", top: `${y(values[values.length - 1])}%` }}
+      />
+    </div>
+  );
+}
+
+function Stat({ label, value, sub, trend, change }: {
+  label: React.ReactNode; value: string; sub: string; trend?: number[]; change?: Change | null;
+}) {
   return (
     <div className="rounded-lg border border-neutral-800 bg-neutral-900/40 px-4 py-3">
       <div className="text-xs uppercase text-neutral-500">{label}</div>
       <div className="text-2xl font-bold tabular-nums">{value}</div>
       <div className="text-xs text-neutral-500">{sub}</div>
+      {trend && trend.length > 1 && <Sparkline values={trend} />}
+      {change && (
+        <div className={`mt-1 text-xs ${change.good === null ? "text-neutral-500" : change.good ? "text-emerald-400" : "text-red-400"}`}>
+          {change.text}
+        </div>
+      )}
     </div>
   );
 }
@@ -274,13 +308,37 @@ export function TrackRecord({ data }: { data: PredictionsOverview }) {
       </p>
     );
   }
+  const t = data.trend;
+  const series = (k: "accuracy" | "eloAccuracy" | "logLoss", scale = 1) =>
+    t.flatMap((p) => (p[k] === null ? [] : [p[k] * scale]));
+  // How much the latest round moved a number, and whether that was for the better.
+  const change = (values: number[], digits: number, unit: string, higherIsBetter: boolean): Change | null => {
+    if (values.length < 2) return null;
+    const d = values[values.length - 1] - values[values.length - 2];
+    const round = t[t.length - 1].roundName ?? `Round ${t[t.length - 1].round}`;
+    if (Math.abs(d) < 0.5 * 10 ** -digits) return { text: `no change after ${round}`, good: null };
+    return { text: `${d > 0 ? "+" : "−"}${Math.abs(d).toFixed(digits)}${unit} after ${round}`, good: d > 0 === higherIsBetter };
+  };
+  const record = series("accuracy", 100);
+  const elo = series("eloAccuracy", 100);
+  const logLoss = series("logLoss");
   return (
     <div className="grid gap-3">
       <div className="grid gap-3 sm:grid-cols-3">
-        <Stat label="Record" value={`${r.correct}–${r.games - (r.correct ?? 0)}`} sub={`${pct(r.accuracy ?? 0)} of winners picked`} />
-        <Stat label="Ratings alone" value={pct(data.eloRecord.accuracy ?? 0)} sub="same games, power ratings only" />
-        <Stat label={<Term id="log-loss">Log loss</Term>} value={(r.logLoss ?? 0).toFixed(3)} sub="lower is better · coin flip 0.693" />
+        <Stat
+          label="Record" value={`${r.correct}–${r.games - (r.correct ?? 0)}`} sub={`${pct(r.accuracy ?? 0)} of winners picked`}
+          trend={record} change={change(record, 1, " pts", true)}
+        />
+        <Stat
+          label="Ratings alone" value={pct(data.eloRecord.accuracy ?? 0)} sub="same games, power ratings only"
+          trend={elo} change={change(elo, 1, " pts", true)}
+        />
+        <Stat
+          label={<Term id="log-loss">Log loss</Term>} value={(r.logLoss ?? 0).toFixed(3)} sub="lower is better · coin flip 0.693"
+          trend={logLoss} change={change(logLoss, 3, "", false)}
+        />
       </div>
+      {t.length > 1 && <SeasonChart trend={t} />}
       <Link href="/predictions/history" className="justify-self-start text-sm text-orange-400 hover:underline">
         Full prediction history, with Jev and Polymarket →
       </Link>
