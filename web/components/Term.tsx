@@ -2,7 +2,6 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import Link from "@/components/Link";
 import { TERMS } from "@/lib/glossary";
 
 const WIDTH = 256;
@@ -112,9 +111,11 @@ export default function Term({ id, children }: { id: string; children?: React.Re
               {term.name && <span className="font-normal text-neutral-500"> · {term.name}</span>}
             </div>
             <p>{term.short}</p>
-            <Link href={`/guide#${term.id}`} onClick={hide} className="mt-1.5 inline-block text-xs text-orange-400 hover:underline">
+            {/* A plain link on purpose: only a full page load makes the Guide's
+                :target highlight show (client-side navigation doesn't update it). */}
+            <a href={`/guide#${term.id}`} className="mt-1.5 inline-block text-xs text-orange-400 hover:underline">
               More in the Guide →
-            </Link>
+            </a>
           </div>,
           document.body,
         )}
