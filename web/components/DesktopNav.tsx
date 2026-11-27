@@ -88,7 +88,8 @@ function Dropdown({ label, groups }: { label: string; groups: NavGroup[] }) {
 export default function DesktopNav() {
   const pathname = usePathname();
   return (
-    <nav className="hidden items-center gap-4 text-sm text-neutral-300 lg:flex">
+    // Tighter below xl so the search box keeps its width on 1024px screens.
+    <nav className="hidden items-center gap-3 text-sm text-neutral-300 lg:flex xl:gap-4">
       {NAV.map((item) =>
         "groups" in item ? (
           <Dropdown key={item.label} label={item.label} groups={item.groups} />
