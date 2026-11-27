@@ -1,5 +1,6 @@
 export const metadata = { title: "Referees" };
 
+import Term from "@/components/Term";
 import { getReferees, type RefereeEntry } from "@/lib/api";
 import { currentSeason } from "@/lib/season";
 
@@ -66,7 +67,7 @@ export default async function RefereesPage() {
             <tr>
               <th className="px-3 py-2">Referee</th>
               <th className="px-3 py-2 text-right">Games</th>
-              <th className="px-3 py-2 text-right">Home win %</th>
+              <th className="px-3 py-2 text-right"><Term id="home-win">Home win %</Term></th>
               <th className="px-3 py-2 text-right">Avg points</th>
               <th className="px-3 py-2 text-right">Fouls/gm</th>
             </tr>

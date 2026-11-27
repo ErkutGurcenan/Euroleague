@@ -201,7 +201,7 @@ export const GLOSSARY: GlossarySection[] = [
     terms: [
       {
         id: "win-chance",
-        label: "Win chance",
+        label: "Win probability",
         short: "Our model's chance that each team wins. It combines power ratings, season efficiency (net rating) and home court, is updated every night and is locked at tip-off.",
       },
       {

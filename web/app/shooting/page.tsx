@@ -3,6 +3,7 @@ export const metadata = { title: "Shooting leaders" };
 import Link from "@/components/Link";
 import Headshot from "@/components/Headshot";
 import PlayersToggle from "@/components/PlayersToggle";
+import Term from "@/components/Term";
 import { getShootingLeaders } from "@/lib/api";
 import { currentSeason } from "@/lib/season";
 
@@ -28,7 +29,7 @@ export default async function ShootingPage() {
           >
             <div className="border-b border-neutral-800 px-4 py-2.5">
               <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-300">
-                {cat.label}
+                {cat.key === "ts" || cat.key === "efg" ? <Term id={cat.key}>{cat.label}</Term> : cat.label}
               </h2>
               <span className="text-xs text-neutral-500">{cat.sub}</span>
             </div>

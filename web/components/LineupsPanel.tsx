@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "@/components/Link";
+import Term from "@/components/Term";
 import { useState } from "react";
 import type { ClubLineups, LineupRow } from "@/lib/api";
 import { clubAbbr } from "@/lib/clubs";
@@ -69,10 +70,10 @@ export default function LineupsPanel({ data }: { data: LineupsData }) {
             <tr>
               <th className="px-3 py-2">Lineup</th>
               <th className="px-2 py-2 text-right">Min</th>
-              <th className="px-2 py-2 text-right">Poss</th>
-              <th className="px-2 py-2 text-right">Off</th>
-              <th className="px-2 py-2 text-right">Def</th>
-              <th className="px-3 py-2 text-right">Net</th>
+              <th className="px-2 py-2 text-right"><Term id="per-100">Poss</Term></th>
+              <th className="px-2 py-2 text-right"><Term id="net-rating">Off</Term></th>
+              <th className="px-2 py-2 text-right"><Term id="net-rating">Def</Term></th>
+              <th className="px-3 py-2 text-right"><Term id="net-rating">Net</Term></th>
             </tr>
           </thead>
           <tbody>

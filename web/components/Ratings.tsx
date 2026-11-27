@@ -1,4 +1,5 @@
 import Link from "@/components/Link";
+import Term from "@/components/Term";
 import type { PowerRanking, TeamOdds } from "@/lib/api";
 
 function TeamCell({ t }: { t: { clubCode: string; clubName: string; clubCrest: string | null } }) {
@@ -45,12 +46,12 @@ export function PowerRankingsTable({ teams }: { teams: PowerRanking[] }) {
             <tr>
               <th className="px-3 py-2">#</th>
               <th className="px-3 py-2">Team</th>
-              <th className="px-2 py-2 text-right">Rating</th>
-              <th className="px-2 py-2 text-right">Last game</th>
-              <th className="px-2 py-2 text-right">Season</th>
+              <th className="px-2 py-2 text-right"><Term id="rating">Rating</Term></th>
+              <th className="px-2 py-2 text-right"><Term id="rating-change">Last game</Term></th>
+              <th className="px-2 py-2 text-right"><Term id="rating-change">Season</Term></th>
               <th className="px-2 py-2 text-right">W–L</th>
-              <th className="px-2 py-2 text-right" title="Chance to beat an average EuroLeague team on a neutral court">vs avg</th>
-              <th className="px-3 py-2">Trend</th>
+              <th className="px-2 py-2 text-right"><Term id="vs-avg">vs avg</Term></th>
+              <th className="px-3 py-2"><Term id="trend">Trend</Term></th>
             </tr>
           </thead>
           <tbody>
@@ -106,10 +107,10 @@ export function OddsTable({ teams, simulations, remainingGames }: { teams: TeamO
             <tr>
               <th className="px-3 py-2">Team</th>
               <th className="px-2 py-2 text-right">Now</th>
-              <th className="px-2 py-2 text-right">Projected</th>
+              <th className="px-2 py-2 text-right"><Term id="projected">Projected</Term></th>
               <th className="px-2 py-2">1st place</th>
-              <th className="px-2 py-2">Top 6</th>
-              <th className="px-2 py-2">Play-in</th>
+              <th className="px-2 py-2"><Term id="top-6">Top 6</Term></th>
+              <th className="px-2 py-2"><Term id="top-6">Play-in</Term></th>
               <th className="px-2 py-2">Playoffs</th>
               <th className="px-2 py-2">Final Four</th>
               <th className="px-3 py-2">Title</th>

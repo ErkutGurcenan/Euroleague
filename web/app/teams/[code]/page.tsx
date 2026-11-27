@@ -5,6 +5,7 @@ import GameCard from "@/components/GameCard";
 import Headshot from "@/components/Headshot";
 import { isUnavailable, noteText, StatusPill } from "@/components/InjuryStatus";
 import ShotChartExplorer from "@/components/ShotChartExplorer";
+import Term from "@/components/Term";
 import LineupsPanel from "@/components/LineupsPanel";
 import { OnOffRanking } from "@/components/OnOff";
 import { getClub, getClubHistory, getClubLineups, getClubOnOff, getClubShots, getInjuries } from "@/lib/api";
@@ -227,7 +228,7 @@ export default async function TeamPage({
               <th className="px-2 py-2 text-right">Pts</th>
               <th className="px-2 py-2 text-right">Reb</th>
               <th className="px-2 py-2 text-right">Ast</th>
-              <th className="px-2 py-2 text-right">PIR</th>
+              <th className="px-2 py-2 text-right"><Term id="pir">PIR</Term></th>
             </tr>
           </thead>
           <tbody>

@@ -1,4 +1,5 @@
 import Link from "@/components/Link";
+import Term from "@/components/Term";
 import type { ClubBadge, PaperGame, PaperTrade, Prediction, PredictionsOverview, StrategySummary } from "@/lib/api";
 import { clubAbbr } from "@/lib/clubs";
 
@@ -200,10 +201,10 @@ export function UpcomingList({ items }: { items: Prediction[] }) {
           <tr>
             <th className="px-3 py-2">When (UTC)</th>
             <th className="px-3 py-2">Game</th>
-            <th className="px-3 py-2">Win probability</th>
-            <th className="px-3 py-2 text-right">Expected margin</th>
-            <th className="px-3 py-2 text-right">Jev AI</th>
-            <th className="px-3 py-2 text-right">Polymarket</th>
+            <th className="px-3 py-2"><Term id="win-chance">Win probability</Term></th>
+            <th className="px-3 py-2 text-right"><Term id="margin">Expected margin</Term></th>
+            <th className="px-3 py-2 text-right"><Term id="jev">Jev AI</Term></th>
+            <th className="px-3 py-2 text-right"><Term id="polymarket">Polymarket</Term></th>
           </tr>
         </thead>
         <tbody>
@@ -252,7 +253,7 @@ export function UpcomingList({ items }: { items: Prediction[] }) {
   );
 }
 
-function Stat({ label, value, sub }: { label: string; value: string; sub: string }) {
+function Stat({ label, value, sub }: { label: React.ReactNode; value: string; sub: string }) {
   return (
     <div className="rounded-lg border border-neutral-800 bg-neutral-900/40 px-4 py-3">
       <div className="text-xs uppercase text-neutral-500">{label}</div>
@@ -278,7 +279,7 @@ export function TrackRecord({ data }: { data: PredictionsOverview }) {
       <div className="grid gap-3 sm:grid-cols-3">
         <Stat label="Record" value={`${r.correct}–${r.games - (r.correct ?? 0)}`} sub={`${pct(r.accuracy ?? 0)} of winners picked`} />
         <Stat label="Ratings alone" value={pct(data.eloRecord.accuracy ?? 0)} sub="same games, power ratings only" />
-        <Stat label="Log loss" value={(r.logLoss ?? 0).toFixed(3)} sub="lower is better · coin flip 0.693" />
+        <Stat label={<Term id="log-loss">Log loss</Term>} value={(r.logLoss ?? 0).toFixed(3)} sub="lower is better · coin flip 0.693" />
       </div>
       <Link href="/predictions/history" className="justify-self-start text-sm text-orange-400 hover:underline">
         Full prediction history, with Jev and Polymarket →
@@ -368,7 +369,7 @@ export function BacktestPanel({ data }: { data: PredictionsOverview }) {
         </div>
       </div>
       <div className="grid content-start gap-2">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-neutral-400">Calibration</h3>
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-neutral-400"><Term id="calibration">Calibration</Term></h3>
         <Calibration bins={b.calibration} />
         <p className="text-sm text-neutral-400">
           Each dot groups games by the model&apos;s home win chance (across) and shows how often the home
@@ -618,9 +619,9 @@ function NextTrades({ items }: { items: Prediction[] }) {
           <thead className="bg-neutral-900 text-left text-xs uppercase text-neutral-400">
             <tr>
               <th className="px-3 py-2">Game</th>
-              <th className="px-3 py-2 text-right">Polymarket, home</th>
+              <th className="px-3 py-2 text-right"><Term id="polymarket">Polymarket, home</Term></th>
               <th className="px-3 py-2">Eurostepper</th>
-              <th className="px-3 py-2">Jev AI</th>
+              <th className="px-3 py-2"><Term id="jev">Jev AI</Term></th>
               <th className="px-3 py-2">When (UTC)</th>
             </tr>
           </thead>
@@ -682,7 +683,7 @@ export function PaperTradingPanel({ data }: { data: PredictionsOverview }) {
             <thead className="bg-neutral-900 text-left text-xs uppercase text-neutral-400">
               <tr>
                 <th className="px-3 py-2">Game</th>
-                <th className="px-3 py-2 text-right">Polymarket, home</th>
+                <th className="px-3 py-2 text-right"><Term id="polymarket">Polymarket, home</Term></th>
                 <th className="px-3 py-2">Eurostepper, value</th>
                 <th className="px-3 py-2">Eurostepper, pick</th>
                 <th className="px-3 py-2">Jev AI, value</th>
