@@ -1,6 +1,6 @@
 import Link from "@/components/Link";
 import { LiveScoresProvider, LiveStrip } from "@/components/LiveScores";
-import { BacktestPanel, MarketPanel, PaperTradingPanel, TrackRecord, UpcomingList } from "@/components/Predictions";
+import { BacktestPanel, PaperTradingPanel, TrackRecord, UpcomingList } from "@/components/Predictions";
 import PredictionsToggle from "@/components/PredictionsToggle";
 import { getLive, getPredictions } from "@/lib/api";
 import { currentSeason } from "@/lib/season";
@@ -39,10 +39,6 @@ export default async function PredictionsPage() {
         <section className="grid gap-3">
           <h2 className="text-lg font-semibold">Track record this season</h2>
           <TrackRecord data={data} />
-        </section>
-        <section className="grid gap-3">
-          <h2 className="text-lg font-semibold">Against the market</h2>
-          <MarketPanel data={data} />
         </section>
         <section className="grid gap-3">
           <h2 className="text-lg font-semibold">Paper trading</h2>
