@@ -1,4 +1,5 @@
 import Link from "@/components/Link";
+import PagedTable from "@/components/PagedTable";
 import SeasonChart from "@/components/SeasonChart";
 import Term from "@/components/Term";
 import type { ClubBadge, PaperGame, PaperTrade, Prediction, PredictionsOverview, StrategySummary } from "@/lib/api";
@@ -662,8 +663,8 @@ export function PaperTradingPanel({ data }: { data: PredictionsOverview }) {
       ))}
       {paper.series.length >= 2 && <PnlChart series={paper.series} />}
       {paper.games.length > 0 && (
-        <div className="overflow-x-auto rounded-lg border border-neutral-800">
-          <table className="w-full whitespace-nowrap text-sm">
+        <PagedTable
+          head={
             <thead className="bg-neutral-900 text-left text-xs uppercase text-neutral-400">
               <tr>
                 <th className="px-3 py-2">Game</th>
@@ -675,27 +676,25 @@ export function PaperTradingPanel({ data }: { data: PredictionsOverview }) {
                 <th className="px-3 py-2">Result</th>
               </tr>
             </thead>
-            <tbody>
-              {paper.games.map((g) => (
-                <tr key={g.gameCode} className="border-t border-neutral-800/60">
-                  <td className="px-3 py-2">
-                    <Link href={`/games/${g.gameCode}`} className="hover:text-orange-400">{clubAbbr(g.home.clubCode)} v {clubAbbr(g.away.clubCode)}</Link>
-                  </td>
-                  <td className="px-3 py-2 text-right tabular-nums text-neutral-300" title={`Last price before tip-off, saved ${utcTime(g.pricedAt)} UTC`}>
-                    {pct(g.marketHomePrice)}
-                  </td>
-                  <td className="px-3 py-2 tabular-nums"><TradeCell t={g.trades.eurostepper} g={g} /></td>
-                  <td className="px-3 py-2 tabular-nums"><TradeCell t={g.trades.eurostepper_pick} g={g} showModel={false} /></td>
-                  <td className="px-3 py-2 tabular-nums"><TradeCell t={g.trades.jev} g={g} /></td>
-                  <td className="px-3 py-2 tabular-nums"><TradeCell t={g.trades.jev_pick} g={g} showModel={false} /></td>
-                  <td className="px-3 py-2 tabular-nums text-neutral-400">
-                    {g.result ? `${g.result.homeScore}–${g.result.awayScore}` : "in play"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+          }
+          rows={paper.games.map((g) => (
+            <tr key={g.gameCode} className="border-t border-neutral-800/60">
+              <td className="px-3 py-2">
+                <Link href={`/games/${g.gameCode}`} className="hover:text-orange-400">{clubAbbr(g.home.clubCode)} v {clubAbbr(g.away.clubCode)}</Link>
+              </td>
+              <td className="px-3 py-2 text-right tabular-nums text-neutral-300" title={`Last price before tip-off, saved ${utcTime(g.pricedAt)} UTC`}>
+                {pct(g.marketHomePrice)}
+              </td>
+              <td className="px-3 py-2 tabular-nums"><TradeCell t={g.trades.eurostepper} g={g} /></td>
+              <td className="px-3 py-2 tabular-nums"><TradeCell t={g.trades.eurostepper_pick} g={g} showModel={false} /></td>
+              <td className="px-3 py-2 tabular-nums"><TradeCell t={g.trades.jev} g={g} /></td>
+              <td className="px-3 py-2 tabular-nums"><TradeCell t={g.trades.jev_pick} g={g} showModel={false} /></td>
+              <td className="px-3 py-2 tabular-nums text-neutral-400">
+                {g.result ? `${g.result.homeScore}–${g.result.awayScore}` : "in play"}
+              </td>
+            </tr>
+          ))}
+        />
       )}
       <NextTrades items={data.upcoming} />
       {/* one string: the JSX compiler drops the space after an expression in multi-line text with entities */}
