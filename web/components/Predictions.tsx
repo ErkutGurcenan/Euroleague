@@ -15,10 +15,6 @@ function cents(p: number): string {
   return Number.isInteger(c) ? `${c}¢` : `${c.toFixed(1)}¢`;
 }
 
-function plural(n: number, word: string): string {
-  return `${n} ${word}${n === 1 ? "" : "s"}`;
-}
-
 function money(x: number): string {
   return `${x >= 0 ? "+" : "−"}$${Math.abs(x).toFixed(2)}`;
 }
@@ -440,58 +436,6 @@ export function BacktestPanel({ data }: { data: PredictionsOverview }) {
           they didn&apos;t improve the backtest.
         </p>
       </div>
-    </div>
-  );
-}
-
-function againstMarket(name: string, x: { games: number; right: number }, total: number): string {
-  if (x.games === 0) return `${name} hasn't picked a different winner from the market yet.`;
-  return `${name} picked a different winner from the market in ${x.games} of ${plural(total, "game")} `
-    + `and was right ${plural(x.right, "time")}.`;
-}
-
-/** Both models graded against Polymarket's last price before tip-off. */
-export function MarketPanel({ data }: { data: PredictionsOverview }) {
-  const m = data.market;
-  const best = m.games ? Math.min(m.ours.logLoss ?? 9, m.ai.logLoss ?? 9, m.market.logLoss ?? 9) : null;
-  const card = (label: string, sc: typeof m.ours) => (
-    <div className={`rounded-lg border bg-neutral-900/40 px-4 py-3 ${best !== null && sc.logLoss === best ? "border-orange-600/60" : "border-neutral-800"}`}>
-      <div className="text-xs uppercase text-neutral-500">{label}</div>
-      <div className="text-2xl font-bold tabular-nums">
-        {sc.games ? `${sc.correct}–${sc.games - (sc.correct ?? 0)}` : "–"}
-      </div>
-      <div className="text-xs text-neutral-500">
-        {sc.games ? `${pct(sc.accuracy ?? 0)} correct · log loss ${(sc.logLoss ?? 0).toFixed(3)} · Brier ${(sc.brier ?? 0).toFixed(3)}` : "no graded games yet"}
-      </div>
-    </div>
-  );
-  const d = m.disagree;
-  return (
-    <div className="grid gap-3">
-      <div className="grid gap-3 sm:grid-cols-3">
-        {card("Eurostepper model", m.ours)}
-        {card("Jev AI", m.ai)}
-        {card(m.source, m.market)}
-      </div>
-      {m.games === 0 ? (
-        <p className="text-sm text-neutral-400">
-          Polymarket prices are saved every 15 minutes until tip-off ({`${m.upcomingPriced} upcoming games so far`}).
-          The comparison fills in as games are played.
-        </p>
-      ) : (
-        <p className="text-sm text-neutral-400">
-          {`${againstMarket("Eurostepper", d.ours, m.games)} ${againstMarket("Jev", d.ai, m.games)}`}
-        </p>
-      )}
-      <p className="text-xs text-neutral-500">
-        Jev AI is TypeSafe&apos;s decision model: before each game it gets the same kind of facts as ours,
-        but never our prediction. Polymarket is a prediction market where a share in the winning team
-        pays $1, so a price of 77¢ means traders give that team about a 77% chance. Each game is graded
-        at the last price saved
-        before tip-off (midway between the bid and the ask), on the same games for all three. The market
-        already prices in what bettors know, injuries included, so matching its log loss is hard and
-        beating it is the real test.
-      </p>
     </div>
   );
 }
