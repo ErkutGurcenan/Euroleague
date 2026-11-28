@@ -2,7 +2,7 @@ import Link from "@/components/Link";
 import PagedTable from "@/components/PagedTable";
 import SeasonChart from "@/components/SeasonChart";
 import Term from "@/components/Term";
-import type { ClubBadge, PaperGame, PaperTrade, Prediction, PredictionsOverview, StrategySummary } from "@/lib/api";
+import type { ClubBadge, PaperGame, PaperTrade, Prediction, PredictionsOverview, Score, StrategySummary } from "@/lib/api";
 import { clubAbbr } from "@/lib/clubs";
 
 function pct(p: number): string {
@@ -372,8 +372,35 @@ function Calibration({ bins }: { bins: PredictionsOverview["backtest"]["calibrat
   );
 }
 
+/** A season's accuracy as a small bar, with a mark at the all-seasons average. */
+function AccuracyBar({ value, average }: { value: number; average: number }) {
+  return (
+    <span aria-hidden="true" className="relative mr-2 inline-block h-1.5 w-10 overflow-hidden rounded-full bg-neutral-800 align-middle sm:w-20">
+      <span className={`absolute inset-y-0 left-0 ${value >= average ? "bg-orange-500" : "bg-orange-500/45"}`} style={{ width: `${value * 100}%` }} />
+      <span className="absolute inset-y-0 w-px bg-neutral-300" style={{ left: `${average * 100}%` }} />
+    </span>
+  );
+}
+
 export function BacktestPanel({ data }: { data: PredictionsOverview }) {
   const b = data.backtest;
+  const average = b.model.accuracy ?? 0;
+  const best = Math.max(...b.seasons.map((s) => s.accuracy ?? 0));
+  // Only the season being shown, and only while it still has games to come.
+  const inProgress = data.upcoming.length > 0 ? data.season : null;
+  const correctOf = (s: Score) => (
+    <>
+      <span className="text-neutral-100">{(s.correct ?? 0).toLocaleString("en-GB")}</span>
+      <span className="text-neutral-500">{` / ${s.games.toLocaleString("en-GB")}`}</span>
+    </>
+  );
+  // The best season's figure is picked out in orange.
+  const accuracyOf = (s: Score, isBest = false) => s.accuracy === null ? "–" : (
+    <>
+      <AccuracyBar value={s.accuracy} average={average} />
+      <span className={isBest ? "text-orange-400" : ""}>{`${(s.accuracy * 100).toFixed(1)}%`}</span>
+    </>
+  );
   const bars: [string, number | null, string][] = [
     ["Home team always wins", b.homeAlways.accuracy, "bg-neutral-500"],
     ["Power ratings only", b.elo.accuracy, "bg-orange-500/60"],
@@ -395,32 +422,45 @@ export function BacktestPanel({ data }: { data: PredictionsOverview }) {
             </div>
           ))}
         </div>
-        <p className="text-sm text-neutral-400">
-          Winners picked in {b.model.games.toLocaleString("en-GB")} games, each season predicted by a model
-          trained only on the seasons before it. When the model called a game at 70% or more, the
-          favourite won {pct(b.favourites70.accuracy ?? 0)} of {b.favourites70.games.toLocaleString("en-GB")} times.
-        </p>
-        <div className="overflow-x-auto rounded-lg border border-neutral-800">
-          <table className="w-full whitespace-nowrap text-sm">
-            <thead className="bg-neutral-900 text-left text-xs uppercase text-neutral-400">
-              <tr>
-                <th className="px-3 py-2">Season</th>
-                <th className="px-2 py-2 text-right">Games</th>
-                <th className="px-2 py-2 text-right">Correct</th>
-                <th className="px-3 py-2 text-right">Log loss</th>
-              </tr>
-            </thead>
-            <tbody>
-              {b.seasons.map((s) => (
-                <tr key={s.season} className="border-t border-neutral-800/60">
-                  <td className="px-3 py-1.5 text-neutral-300">{s.seasonLabel}</td>
-                  <td className="px-2 py-1.5 text-right tabular-nums text-neutral-400">{s.games}</td>
-                  <td className="px-2 py-1.5 text-right tabular-nums">{s.accuracy !== null ? `${(s.accuracy * 100).toFixed(1)}%` : "–"}</td>
-                  <td className="px-3 py-1.5 text-right tabular-nums text-neutral-400">{s.logLoss?.toFixed(3) ?? "–"}</td>
+        <div className="grid gap-2">
+          {/* Phones drop the Log loss column so the table fits without scrolling sideways. */}
+          <div className="overflow-x-auto rounded-lg border border-neutral-800">
+            <table className="w-full whitespace-nowrap text-sm">
+              <thead className="bg-neutral-900 text-left text-xs uppercase text-neutral-400">
+                <tr>
+                  <th className="px-2 py-2 sm:px-3">Season</th>
+                  <th className="px-2 py-2 text-right">Correct</th>
+                  <th className="px-2 py-2 text-right">Accuracy</th>
+                  <th className="hidden px-3 py-2 text-right sm:table-cell">Log loss</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {b.seasons.map((s) => (
+                  <tr key={s.season} className="border-t border-neutral-800/60">
+                    <td className="px-2 py-1.5 text-neutral-300 sm:px-3">
+                      {s.seasonLabel}
+                      {s.season === inProgress && <span className="ml-1.5 text-xs text-neutral-500">so far</span>}
+                    </td>
+                    <td className="px-2 py-1.5 text-right tabular-nums">{correctOf(s)}</td>
+                    <td className="px-2 py-1.5 text-right font-semibold tabular-nums">{accuracyOf(s, s.accuracy === best)}</td>
+                    <td className="hidden px-3 py-1.5 text-right tabular-nums text-neutral-400 sm:table-cell">{s.logLoss?.toFixed(3) ?? "–"}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot className="border-t border-neutral-700 bg-neutral-900/60">
+                <tr>
+                  <td className="px-2 py-2 font-semibold sm:px-3">All seasons</td>
+                  <td className="px-2 py-2 text-right font-semibold tabular-nums">{correctOf(b.model)}</td>
+                  <td className="px-2 py-2 text-right font-semibold tabular-nums">{accuracyOf(b.model)}</td>
+                  <td className="hidden px-3 py-2 text-right tabular-nums text-neutral-400 sm:table-cell">{b.model.logLoss?.toFixed(3) ?? "–"}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          <p className="text-xs text-neutral-500">
+            {"Each season predicted by a model trained only on the seasons before it. "
+              + "The thin line on each bar marks the all-seasons average."}
+          </p>
         </div>
       </div>
       <div className="grid content-start gap-2">
