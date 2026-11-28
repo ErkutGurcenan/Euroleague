@@ -3,10 +3,11 @@ export type NavGroup = { title: string; links: NavLink[] };
 export type NavItem = NavLink | { label: string; groups: NavGroup[] };
 
 export const NAV: NavItem[] = [
-  { href: "/", label: "Home" },
+  // Predictions is the main page for now; the season overview moved to /season.
+  { href: "/", label: "Predictions" },
+  { href: "/season", label: "Season" },
   { href: "/standings", label: "Standings" },
   { href: "/games", label: "Games" },
-  { href: "/predictions", label: "Predictions" },
   { href: "/teams", label: "Teams" },
   { href: "/players", label: "Players" },
   { href: "/injuries", label: "Injuries" },
@@ -41,12 +42,15 @@ export const NAV: NavItem[] = [
 
 /** Extra paths that belong to a top-level link (tabs living at their own URL). */
 const ALIASES: Record<string, string[]> = {
+  "/": ["/predictions"],
   "/players": ["/fantasy"],
 };
 
 export function isActive(href: string, pathname: string): boolean {
-  if (href === "/") return pathname === "/";
-  return [href, ...(ALIASES[href] ?? [])].some(
+  if (href === "/" && pathname === "/") return true;
+  // "/" itself would prefix-match every page, so only its aliases count.
+  const own = href === "/" ? [] : [href];
+  return [...own, ...(ALIASES[href] ?? [])].some(
     (p) => pathname === p || pathname.startsWith(`${p}/`),
   );
 }

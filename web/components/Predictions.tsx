@@ -180,7 +180,7 @@ export function PredictionCard({ p, compact = false }: { p: Prediction; compact?
       {!compact && <p className="text-xs text-neutral-500">
         Ratings alone give {clubAbbr(p.home.clubCode)} {pct(p.eloHomeProb)}. The call combines power ratings,
         season efficiency and home court, is updated every night and is locked at tip-off.{" "}
-        <Link href="/predictions" className="text-orange-400 hover:underline">Track record →</Link>
+        <Link href="/" className="text-orange-400 hover:underline">Track record →</Link>
       </p>}
     </div>
   );

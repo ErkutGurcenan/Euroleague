@@ -6,7 +6,7 @@ export default function PredictionsToggle({ active }: { active: "overview" | "hi
   const off = "text-neutral-400 hover:text-white";
   return (
     <span className="flex shrink-0 overflow-hidden rounded-md border border-neutral-700">
-      <Link href="/predictions" className={`${base} ${active === "overview" ? on : off}`}>
+      <Link href="/" className={`${base} ${active === "overview" ? on : off}`}>
         Overview
       </Link>
       <Link href="/predictions/history" className={`${base} ${active === "history" ? on : off}`}>

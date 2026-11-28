@@ -89,7 +89,7 @@ export default function DesktopNav() {
   const pathname = usePathname();
   return (
     // Tighter below xl so the search box keeps its width on 1024px screens.
-    <nav className="hidden items-center gap-3 text-sm text-neutral-300 lg:flex xl:gap-4">
+    <nav className="hidden items-center gap-2.5 text-sm text-neutral-300 lg:flex xl:gap-4">
       {NAV.map((item) =>
         "groups" in item ? (
           <Dropdown key={item.label} label={item.label} groups={item.groups} />
