@@ -16,8 +16,10 @@ mkdir -p "$LOG_DIR"
 
 # Type check first, while the old server still runs, so a type error stops
 # here instead of taking the site down. next build skips its own check
-# (next.config.ts): it needs more memory than this box has.
+# (next.config.ts): it needs more memory than this box has. Route types are
+# regenerated first, or a moved or deleted page fails the check on stale types.
 if [[ "${1:-}" != "--no-build" ]]; then
+  npx next typegen >/dev/null
   NODE_OPTIONS=--max-old-space-size=700 npx tsc --noEmit -p .
 fi
 

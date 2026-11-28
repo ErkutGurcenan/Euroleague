@@ -106,7 +106,7 @@ function Crest({ team }: { team: ClubBadge }) {
   ) : null;
 }
 
-/** Home page: games on now and those just finished, each linking to its match page. */
+/** Main and Season pages: games on now and those just finished, each linking to its match page. */
 export function LiveStrip() {
   const games = (useContext(LiveContext)?.games ?? []).filter((g) => g.status !== "scheduled");
   if (games.length === 0) return null;

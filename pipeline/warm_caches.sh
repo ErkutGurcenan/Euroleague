@@ -9,7 +9,7 @@ touch ../db/data_version
 for path in /api/meta /api/lineups /api/impact /api/games/notable; do
   curl -s -o /dev/null -m 180 "http://127.0.0.1:8000$path" || true
 done
-for path in / /standings /games /predictions; do
+for path in / /season /standings /games; do
   curl -s -o /dev/null -m 60 "http://127.0.0.1:3000$path" || true
 done
 echo "$(date -Is) caches warmed"

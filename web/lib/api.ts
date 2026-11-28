@@ -855,6 +855,18 @@ export type Score = {
   brier?: number | null;
 };
 
+/** The live track record after each round so far (running totals). */
+export type TrendPoint = {
+  round: number;
+  roundName: string | null;
+  games: number;
+  accuracy: number | null;
+  logLoss: number | null;
+  eloAccuracy: number | null;
+  jevAccuracy: number | null;
+  marketAccuracy: number | null;
+};
+
 export type PredictionsOverview = {
   season: string;
   upcoming: Prediction[];
@@ -862,6 +874,7 @@ export type PredictionsOverview = {
   upcomingRoundNumber: number | null;
   record: Score;
   eloRecord: Score;
+  trend: TrendPoint[];
   recent: Prediction[];
   challenger: {
     provider: string;

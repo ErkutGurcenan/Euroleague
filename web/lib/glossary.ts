@@ -197,7 +197,7 @@ export const GLOSSARY: GlossarySection[] = [
   {
     id: "predictions",
     title: "Predictions and markets",
-    links: [{ href: "/predictions", label: "Predictions" }],
+    links: [{ href: "/", label: "Predictions" }],
     terms: [
       {
         id: "win-chance",

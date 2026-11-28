@@ -15,6 +15,11 @@ const nextConfig: NextConfig = {
     maximumResponseBody: 5_000_000,
     maximumDiskCacheSize: 500_000_000,
   },
+  // Predictions is the main page for now; old links still land on it.
+  // Temporary (307) so browsers don't remember it if that changes.
+  redirects() {
+    return [{ source: "/predictions", destination: "/", permanent: false }];
+  },
 };
 
 export default nextConfig;
